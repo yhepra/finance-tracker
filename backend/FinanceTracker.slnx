@@ -1,0 +1,16 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/API/">
+    <Project Path="src/API/FinanceTracker.API.csproj" />
+  </Folder>
+  <Folder Name="/src/Core/" />
+  <Folder Name="/src/Core/Application/">
+    <Project Path="src/Core/Application/FinanceTracker.Application.csproj" />
+  </Folder>
+  <Folder Name="/src/Core/Domain/">
+    <Project Path="src/Core/Domain/FinanceTracker.Domain.csproj" />
+  </Folder>
+  <Folder Name="/src/Infrastructure/">
+    <Project Path="src/Infrastructure/FinanceTracker.Infrastructure.csproj" />
+  </Folder>
+</Solution>
