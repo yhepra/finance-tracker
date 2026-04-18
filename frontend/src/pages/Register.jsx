@@ -1,9 +1,11 @@
 import React, { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { Eye, EyeOff, Lock, Mail, Wallet, ArrowRight, ShieldCheck, Cpu } from 'lucide-react'
+import GoogleSignInButton from '../components/GoogleSignInButton'
 
 export default function Register() {
+  const navigate = useNavigate()
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [email, setEmail] = useState('')
@@ -12,6 +14,31 @@ export default function Register() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [registeredEmail, setRegisteredEmail] = useState('')
+
+  const onGoogleCredential = async (credential) => {
+    setError('')
+    setLoading(true)
+    try {
+      const res = await axios.post('/api/auth/google', { credential })
+      localStorage.setItem('auth_token', res.data.token)
+      localStorage.setItem('auth_email', res.data.email)
+      localStorage.setItem('auth_name', res.data.name || '')
+      localStorage.setItem('auth_onboarded', res.data.isOnboardingCompleted ? 'true' : 'false')
+      localStorage.setItem('auth_role', res.data.role || 'User')
+      window.dispatchEvent(new Event('auth-updated'))
+      if (res.data.isOnboardingCompleted) navigate('/dashboard', { replace: true })
+      else navigate('/onboarding', { replace: true })
+    } catch (err) {
+      const apiMessage = err?.response?.data?.message || err?.response?.data?.title
+      const status = err?.response?.status
+      const message = err?.response
+        ? apiMessage || `Login Google gagal (HTTP ${status}).`
+        : 'Tidak bisa menghubungi server API. Pastikan backend jalan di http://localhost:5116'
+      setError(message)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const onSubmit = async (e) => {
     e.preventDefault()
@@ -151,6 +178,15 @@ export default function Register() {
               {error}
             </div>
           )}
+
+          <div className="mb-6">
+            <GoogleSignInButton onCredential={onGoogleCredential} label="Daftar dengan Google" />
+            <div className="mt-6 flex items-center gap-3">
+              <div className="h-px flex-1 bg-slate-200" />
+              <div className="text-xs text-slate-400 font-black uppercase tracking-widest">atau</div>
+              <div className="h-px flex-1 bg-slate-200" />
+            </div>
+          </div>
 
           <form onSubmit={onSubmit} className="space-y-5">
             <div>

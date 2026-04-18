@@ -8,6 +8,7 @@ using FinanceTracker.Infrastructure.Services.Security;
 using FinanceTracker.Infrastructure.Services;
 using FinanceTracker.Infrastructure.Services.Parsers;
 using FinanceTracker.Infrastructure.Services.Integrations;
+using FinanceTracker.API.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -44,6 +45,8 @@ builder.Services.AddScoped<IDashboardService, DashboardDbService>();
 builder.Services.AddSingleton<ISecretProtector, SecretProtector>();
 builder.Services.AddHttpClient();
 builder.Services.AddHttpClient<GeminiHttpClient>();
+builder.Services.AddMemoryCache();
+builder.Services.AddHttpClient<GoogleIdTokenValidator>();
 builder.Services.AddScoped<IGeminiIntegrationService, GeminiIntegrationService>();
 
 var jwtKey = builder.Configuration["Jwt:Key"];

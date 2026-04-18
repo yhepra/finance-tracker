@@ -15,7 +15,7 @@ public sealed class GeminiHttpClient
     public GeminiHttpClient(HttpClient http)
     {
         _http = http;
-        _http.Timeout = TimeSpan.FromMinutes(5);
+        _http.Timeout = TimeSpan.FromMinutes(3);
         if (_http.BaseAddress == null)
         {
             _http.BaseAddress = new Uri("https://generativelanguage.googleapis.com/");

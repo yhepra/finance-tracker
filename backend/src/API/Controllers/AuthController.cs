@@ -1,4 +1,5 @@
 using FinanceTracker.Domain.Entities;
+using FinanceTracker.API.Services;
 using FinanceTracker.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -18,12 +19,14 @@ public class AuthController : ControllerBase
     private readonly AppDbContext _db;
     private readonly IConfiguration _configuration;
     private readonly IHostEnvironment _environment;
+    private readonly GoogleIdTokenValidator _google;
 
-    public AuthController(AppDbContext db, IConfiguration configuration, IHostEnvironment environment)
+    public AuthController(AppDbContext db, IConfiguration configuration, IHostEnvironment environment, GoogleIdTokenValidator google)
     {
         _db = db;
         _configuration = configuration;
         _environment = environment;
+        _google = google;
     }
 
     [AllowAnonymous]
@@ -177,6 +180,63 @@ public class AuthController : ControllerBase
             user.Role));
     }
 
+    [AllowAnonymous]
+    [HttpPost("google")]
+    public async Task<IActionResult> GoogleLogin([FromBody] GoogleLoginRequest request)
+    {
+        var (ok, message, userInfo) = await _google.ValidateAsync(request.Credential, HttpContext.RequestAborted);
+        if (!ok || userInfo == null) return Unauthorized(new { message });
+
+        var email = userInfo.Email.Trim().ToLowerInvariant();
+        var fullName = (userInfo.Name ?? string.Empty).Trim();
+
+        var user = await _db.Users.SingleOrDefaultAsync(u => u.Email == email);
+        if (user == null)
+        {
+            var (hash, salt) = PasswordHashing.HashPassword(Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));
+            user = new User
+            {
+                Email = email,
+                FullName = fullName,
+                PasswordHash = hash,
+                PasswordSalt = salt,
+                IsEmailVerified = true,
+                EmailVerificationToken = null,
+                EmailVerificationTokenExpiry = null,
+                IsOnboardingCompleted = !string.IsNullOrWhiteSpace(fullName),
+                Role = email.Equals("yhepra@gmail.com", StringComparison.OrdinalIgnoreCase) ? "Admin" : "User",
+                CreatedAtUtc = DateTime.UtcNow
+            };
+            _db.Users.Add(user);
+            await _db.SaveChangesAsync();
+        }
+        else
+        {
+            if (!user.IsEmailVerified || user.EmailVerificationToken != null)
+            {
+                user.IsEmailVerified = true;
+                user.EmailVerificationToken = null;
+                user.EmailVerificationTokenExpiry = null;
+            }
+
+            if (email.Equals("yhepra@gmail.com", StringComparison.OrdinalIgnoreCase) && user.Role != "Admin")
+            {
+                user.Role = "Admin";
+            }
+
+            if (string.IsNullOrWhiteSpace(user.FullName) && !string.IsNullOrWhiteSpace(fullName))
+            {
+                user.FullName = fullName;
+                if (!user.IsOnboardingCompleted) user.IsOnboardingCompleted = true;
+            }
+
+            await _db.SaveChangesAsync();
+        }
+
+        var token = CreateJwt(user);
+        return Ok(new AuthResponse(token, user.Email, user.FullName, user.IsOnboardingCompleted, user.Role));
+    }
+
     [Authorize]
     [HttpPost("complete-onboarding")]
     public async Task<IActionResult> CompleteOnboarding([FromBody] UpdateProfileRequest request)
@@ -278,6 +338,7 @@ public class AuthController : ControllerBase
 
     public record RegisterRequest(string Email, string Password);
     public record LoginRequest(string Email, string Password);
+    public record GoogleLoginRequest(string Credential);
     public record AuthResponse(string Token, string Email, string Name, bool IsOnboardingCompleted = false, string Role = "User");
     public record VerifyEmailRequest(string Token);
     public record UpdateProfileRequest(string FullName, DateOnly? DateOfBirth);
