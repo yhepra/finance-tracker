@@ -1,8 +1,9 @@
 import React, { useEffect, useRef } from 'react'
+import { getGoogleClientId } from '../config/env'
 
 export default function GoogleSignInButton({ onCredential, label = 'Lanjut dengan Google' }) {
   const containerRef = useRef(null)
-  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
+  const clientId = getGoogleClientId()
 
   useEffect(() => {
     if (!clientId) return
@@ -22,6 +23,7 @@ export default function GoogleSignInButton({ onCredential, label = 'Lanjut denga
 
       google.initialize({
         client_id: clientId,
+        ux_mode: 'popup',
         callback: (resp) => {
           const cred = resp?.credential
           if (cred) onCredential(cred)
@@ -45,9 +47,16 @@ export default function GoogleSignInButton({ onCredential, label = 'Lanjut denga
   }, [clientId, onCredential])
 
   return (
-    <div>
-      <div ref={containerRef} />
-      {!clientId ? <div className="mt-2 text-xs text-slate-500">{label}: VITE_GOOGLE_CLIENT_ID belum diset.</div> : null}
+    <div className="flex flex-col items-center justify-center w-full">
+      <div 
+        ref={containerRef} 
+        className="flex justify-center w-full min-h-[44px] hover:scale-[1.01] transition-transform duration-200"
+      />
+      {!clientId ? (
+        <div className="mt-4 p-3 rounded-xl bg-amber-50 border border-amber-100 text-[10px] text-amber-700 font-bold uppercase tracking-wider text-center">
+          ⚠️ {label}: GOOGLE CLIENT ID BELUM DISET
+        </div>
+      ) : null}
     </div>
   )
 }

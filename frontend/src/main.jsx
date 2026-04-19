@@ -4,8 +4,9 @@ import axios from 'axios'
 import './index.css'
 import App from './App.jsx'
 import { refreshI18n } from './i18n'
+import { getApiBaseUrl } from './config/env'
 
-axios.defaults.baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5116'
+axios.defaults.baseURL = getApiBaseUrl()
 axios.interceptors.request.use((config) => {
   const token = localStorage.getItem('auth_token')
   if (token) {

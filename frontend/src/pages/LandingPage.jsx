@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { 
     ChevronRight, 
@@ -12,8 +12,17 @@ import {
     Cpu,
     ArrowRight
 } from 'lucide-react';
+import LegalPopup from '../components/LegalPopup';
 
 export default function LandingPage() {
+  const [legalOpen, setLegalOpen] = useState(false);
+  const [legalType, setLegalType] = useState('terms');
+
+  const openLegal = (type) => {
+    setLegalType(type);
+    setLegalOpen(true);
+  };
+
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans selection:bg-blue-100 selection:text-blue-900 scroll-smooth px-2 md:px-0">
       
@@ -38,6 +47,10 @@ export default function LandingPage() {
             <div className="hidden md:flex items-center space-x-10 text-sm font-semibold text-slate-600">
                 <a href="#fitur" className="hover:text-blue-600 transition-colors">Fitur Utama</a>
                 <a href="#tentang" className="hover:text-blue-600 transition-colors">Tentang Kami</a>
+
+                <button type="button" onClick={() => openLegal('terms')} className="hover:text-blue-600 transition-colors">
+                    Syarat
+                </button>
                 <Link to="/login" className="hover:text-blue-600 transition-colors">Masuk</Link>
             </div>
 
@@ -65,7 +78,7 @@ export default function LandingPage() {
             </h1>
             
             <p className="text-xl text-slate-500 mb-12 max-w-2xl mx-auto leading-relaxed font-medium">
-                Satu aplikasi untuk kendali total. Scan rekening koran BNI & BCA secara otomatis, enkripsi data kelas bank, dan kelola arus kas dengan kecerdasan buatan.
+                Satu aplikasi untuk kendali total. Scan rekening koran BCA, BNI, dan Superbank secara otomatis, data Anda aman, dan kelola arus kas dengan cerdas.
             </p>
             
             <div className="flex flex-col sm:flex-row justify-center items-center gap-6">
@@ -81,6 +94,17 @@ export default function LandingPage() {
                     <span className="text-sm font-bold text-slate-600 italic">Data terenkripsi AES-CBC</span>
                 </div>
             </div>
+
+            <div className="mt-10 flex flex-col sm:flex-row justify-center items-center gap-3 text-sm">
+
+                <button
+                    type="button"
+                    onClick={() => openLegal('terms')}
+                    className="w-full sm:w-auto rounded-2xl border border-slate-200 bg-white px-6 py-3 font-bold text-slate-700 hover:bg-slate-50"
+                >
+                    Syarat &amp; Ketentuan
+                </button>
+            </div>
         </div>
 
         {/* Real Feature Preview */}
@@ -93,8 +117,8 @@ export default function LandingPage() {
                                 <div className="p-2 bg-blue-600 text-white rounded-lg"><Cpu size={20}/></div>
                                 <span className="font-black text-blue-900 uppercase tracking-tighter">Gemini Intelligence</span>
                             </div>
-                            <h4 className="text-2xl font-black text-slate-800 mb-2">Automasi BNI & BCA</h4>
-                            <p className="text-slate-500 font-medium">Upload mutasi PDF Anda. Sistem secara otomatis mengekstrak transaksi dan mencocokkan nomor rekening secara presisi.</p>
+                            <h4 className="text-2xl font-black text-slate-800 mb-2">Automasi Bank Statement</h4>
+                            <p className="text-slate-500 font-medium">Upload mutasi PDF Anda dari BCA, BNI, atau Superbank. Sistem secara otomatis mengekstrak transaksi dan mencocokkan nomor rekening secara presisi.</p>
                         </div>
                         <div className="p-8 bg-indigo-50/50 rounded-3xl border border-indigo-100 flex flex-col justify-center">
                             <div className="flex items-center gap-3 mb-4">
@@ -136,7 +160,7 @@ export default function LandingPage() {
                     },
                     {
                         title: "AI Bank Statement Scan",
-                        desc: "Upload PDF mutasi BCA & BNI. Biarkan AI Gemini membaca transaksi dan saldo awal secara instan.",
+                        desc: "Upload PDF mutasi Anda dari BCA, BNI, atau Superbank. Biarkan AI membaca transaksi dan saldo awal secara instan.",
                         icon: <Cpu className="text-indigo-600" size={28} />,
                         bg: "bg-indigo-50"
                     },
@@ -173,11 +197,11 @@ export default function LandingPage() {
                         </div>
                         <pre className="text-xs md:text-sm font-mono text-blue-300 leading-relaxed overflow-x-auto">
 {`{
-  "mission": "Deliver Finance Security",
-  "tech_stack": ["React", ".NET 10", "AI Gemini"],
-  "security": "End-to-End Encryption",
-  "privacy": true,
-  "developer": "Antigravity Dev Team"
+  "misi": "Meningkatkan Literasi Finansial",
+  "teknologi": ["React", ".NET", "AI"],
+  "keamanan": "Enkripsi Data",
+  "privasi": true,
+  "pengembang": "Tim Antigravity"
 }`}
                         </pre>
                     </div>
@@ -186,13 +210,13 @@ export default function LandingPage() {
                 <div>
                     <h2 className="text-4xl md:text-5xl font-black text-slate-900 mb-6 tracking-tighter">Lebih dari sekadar <br/> pelacak uang.</h2>
                     <p className="text-lg text-slate-600 leading-relaxed mb-8">
-                        FinTrack lahir dari visi untuk mendemokratisasi alat manajemen keuangan tingkat korporat bagi pengguna personal. Kami mengintegrasikan kecerdasan buatan Gemini terbaru untuk memastikan transisi dari data mentah ke wawasan finansial terjadi dalam hitungan detik.
+                        FinTrack lahir dari visi untuk mendemokratisasi alat manajemen keuangan bagi pengguna personal. Kami mengintegrasikan kecerdasan buatan terbaru untuk membantu Anda mendapatkan wawasan finansial dalam hitungan detik.
                     </p>
                     <ul className="space-y-4">
                         {[
-                            "Pencocokan akun cerdas via nomor rekening",
-                            "Dukungan enkripsi data personal (PII)",
-                            "Optimasi flow pembacaan PDF perbankan Indonesia",
+                            "Pencocokan akun cerdas",
+                            "Perlindungan data personal",
+                            "Optimasi pembacaan PDF perbankan Indonesia",
                             "Desain antarmuka berstandar internasional"
                         ].map((li, i) => (
                             <li key={i} className="flex items-center gap-3 text-slate-700 font-bold">
@@ -204,6 +228,52 @@ export default function LandingPage() {
                         ))}
                     </ul>
                 </div>
+            </div>
+        </div>
+      </section>
+
+      <section className="py-24 border-t border-slate-100 bg-white">
+        <div className="container mx-auto px-6">
+            <div className="flex flex-col md:flex-row items-end justify-between gap-6 mb-12">
+                <div className="max-w-2xl">
+                    <div className="text-blue-600 font-black text-sm uppercase tracking-widest mb-4">Transparansi</div>
+                    <h2 className="text-4xl md:text-5xl font-extrabold text-slate-900 leading-tight">Syarat, privasi, dan keamanan dalam satu tempat.</h2>
+                </div>
+                <div className="text-sm text-slate-500 font-medium max-w-xl">
+                    Baca ringkasan kebijakan yang paling sering ditanyakan pengguna. Semua ditampilkan dalam popup agar tetap rapi.
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <button
+                    type="button"
+                    onClick={() => openLegal('terms')}
+                    className="text-left bg-slate-50/60 border border-slate-200 rounded-3xl p-8 hover:bg-white hover:shadow-xl hover:shadow-blue-50 transition-all"
+                >
+                    <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center mb-6">
+                        <ArrowRight size={20} />
+                    </div>
+                    <div className="text-xl font-black text-slate-900 tracking-tight mb-2">Syarat &amp; Ketentuan</div>
+                    <div className="text-sm text-slate-500 font-medium leading-relaxed">
+                        Aturan penggunaan layanan, hak dan kewajiban, serta batasan tanggung jawab.
+                    </div>
+                </button>
+
+                <button
+                    type="button"
+                    onClick={() => openLegal('privacy')}
+                    className="text-left bg-slate-50/60 border border-slate-200 rounded-3xl p-8 hover:bg-white hover:shadow-xl hover:shadow-blue-50 transition-all"
+                >
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center mb-6">
+                        <Lock size={20} />
+                    </div>
+                    <div className="text-xl font-black text-slate-900 tracking-tight mb-2">Kebijakan Privasi</div>
+                    <div className="text-sm text-slate-500 font-medium leading-relaxed">
+                        Data apa yang diproses, untuk apa digunakan, dan bagaimana perlindungannya.
+                    </div>
+                </button>
+
+
             </div>
         </div>
       </section>
@@ -221,16 +291,19 @@ export default function LandingPage() {
                 Dibuat dengan dedikasi tinggi oleh Antigravity untuk membantu masyarakat Indonesia lebih literat secara finansial.
             </p>
             <div className="flex flex-wrap justify-center gap-8 mb-12 text-sm font-bold border-y border-white/5 py-8">
-                <a href="#" className="hover:text-blue-400">Kebijakan Privasi</a>
-                <a href="#" className="hover:text-blue-400">Syarat & Ketentuan</a>
-                <a href="#" className="hover:text-blue-400">GitHub</a>
-                <a href="#" className="hover:text-blue-400">LinkedIn</a>
+                <button type="button" onClick={() => openLegal('privacy')} className="hover:text-blue-400">Kebijakan Privasi</button>
+                <button type="button" onClick={() => openLegal('terms')} className="hover:text-blue-400">Syarat &amp; Ketentuan</button>
+
+                <a href="https://github.com/yhepra" target="_blank" rel="noreferrer" className="hover:text-blue-400">GitHub</a>
+                <a href="https://www.linkedin.com/in/yhepra/" target="_blank" rel="noreferrer" className="hover:text-blue-400">LinkedIn</a>
             </div>
             <p className="text-xs text-slate-600 font-mono">
                 &copy; {new Date().getFullYear()} FinTrack Personal. Semua Hak Dilindungi.
             </p>
         </div>
       </footer>
+
+      <LegalPopup open={legalOpen} type={legalType} onClose={() => setLegalOpen(false)} />
       
     </div>
   );

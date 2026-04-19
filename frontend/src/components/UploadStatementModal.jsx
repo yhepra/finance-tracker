@@ -126,7 +126,7 @@ export default function UploadStatementModal({ isOpen, onClose }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[2px] p-4">
       <div className={`bg-white rounded-2xl shadow-2xl w-full ${step === 'preview' ? 'max-w-4xl' : 'max-w-md'} overflow-hidden transform transition-all flex flex-col max-h-[90vh]`}>
         <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-blue-50/80">
           <h3 className="text-xl font-bold text-gray-800 flex items-center">

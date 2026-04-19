@@ -142,7 +142,7 @@ export default function AdminPanel() {
             {/* Modal for Lists */}
             {activeView && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setActiveView(null)}></div>
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={() => setActiveView(null)}></div>
                     <div className="relative bg-white w-full max-w-5xl max-h-[90vh] rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
                         {/* Modal Header */}
                         <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">

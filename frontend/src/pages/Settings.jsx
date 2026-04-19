@@ -42,7 +42,7 @@ function Modal({ open, title, children, onClose, maxWidth = 'max-w-lg' }) {
   if (!open) return null
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center px-6 transition-all duration-300">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-xl animate-in fade-in duration-300" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] animate-in fade-in duration-300" onClick={onClose} />
       <div className={`relative w-full ${maxWidth} bg-white rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in slide-in-from-bottom-4 duration-300`}>
         <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
           <div className="text-xl font-black text-slate-900 tracking-tight">{title}</div>
