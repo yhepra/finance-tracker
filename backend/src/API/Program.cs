@@ -96,7 +96,16 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    await db.Database.MigrateAsync();
+    try
+    {
+        await db.Database.MigrateAsync();
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[Startup] Migration failed: {ex.Message}");
+        Console.WriteLine("[Startup] Falling back to EnsureCreated...");
+        await db.Database.EnsureCreatedAsync();
+    }
 
     var hasCategories = await db.Categories.AnyAsync();
     if (!hasCategories)
