@@ -298,6 +298,7 @@ Based on the truncated description, map each transaction to one of these categor
             "BCA" => "BCA (Bank Central Asia)",
             "BNI" => "BNI (Bank Negara Indonesia)",
             "SUPERBANK" => "Superbank (PT Super Bank Indonesia Tbk)",
+            "JAGO" => "Bank Jago (PT Bank Jago Tbk)",
             _ => bankCode
         };
 
@@ -409,6 +410,105 @@ Extract EVERY single transaction. The opening_balance field is critical - find i
             StatementMonth: stMonth,
             AccountNumber: accNo,
             Raw: modelText2);
+    }
+
+    public async Task<GeminiBudgetSuggestionResult> SuggestBudgetsAsync(int userId, decimal income, IReadOnlyList<dynamic> recentTransactions, CancellationToken cancellationToken = default)
+    {
+        var (ok, message, apiKey, requestedModel) = await GetApiKeyAndModelAsync(userId, cancellationToken);
+        if (!ok)
+        {
+            return new GeminiBudgetSuggestionResult(false, message, Array.Empty<BudgetSuggestionRow>());
+        }
+
+        var txJson = JsonSerializer.Serialize(recentTransactions, new JsonSerializerOptions { WriteIndented = true });
+        
+        var prompt = $$"""
+You are an expert financial advisor AI. The user has an estimated monthly income of Rp {{income}}. 
+Below is their recent transaction history (in JSON). 
+Your task is to analyze these expenses and suggest a smart monthly budget allocation for each active category.
+
+### GOALS:
+1. Provide a healthy budget logic (for example, keeping 'Kebutuhan/Needs' under 50%, 'Keinginan/Wants' under 30%, and 'Tabungan/Savings' around 20%, but adjust based on their real spending habits).
+2. If they overspend on Food, maybe suggest a tight but realistic limit.
+3. Every suggestion should include the CategoryId, the CategoryName, the RecommendedAmount (in IDR), and a short, friendly, encouraging sentence (Reason) explaining why this amount was chosen.
+
+### IMPORTANT RULES:
+- ONLY return a valid JSON array. No markdown blocks, no ```json, no extra text.
+- The amount must be a positive integer (not exceeding the total income when summed up).
+- Ensure the total of all RecommendedAmounts is LESS THAN OR EQUAL TO the total income ({{income}}).
+
+### INPUT DATA:
+Transactions:
+{{txJson}}
+
+### OUTPUT FORMAT (JSON Array):
+[
+  {
+    "categoryId": 1,
+    "categoryName": "Makanan & Minuman",
+    "recommendedAmount": 3000000,
+    "reason": "Berdasarkan riwayat, pengeluaran makan kamu cukup stabil. Angka ini pas untuk porsi kebutuhan harian."
+  }
+]
+""";
+
+        var payload = new
+        {
+            contents = new[]
+            {
+                new { parts = new[] { new { text = prompt } } }
+            }
+        };
+
+        HttpStatusCode status;
+        string body;
+        try
+        {
+            var resp = await _client.GenerateContentAsync(apiKey, requestedModel, payload, cancellationToken);
+            status = resp.StatusCode;
+            body = resp.Body;
+        }
+        catch (Exception ex)
+        {
+            return new GeminiBudgetSuggestionResult(false, "Koneksi ke Gemini gagal.", Array.Empty<BudgetSuggestionRow>(), Details: ex.Message);
+        }
+
+        if (status >= HttpStatusCode.BadRequest)
+            return new GeminiBudgetSuggestionResult(false, "Gagal mendapatkan saran dari Gemini.", Array.Empty<BudgetSuggestionRow>(), Raw: body);
+
+        if (!TryExtractModelText(body, out var modelText))
+            return new GeminiBudgetSuggestionResult(false, "Respon invalid dari Gemini.", Array.Empty<BudgetSuggestionRow>(), Raw: body);
+
+        var jsonText = StripCodeFences(modelText);
+        
+        try
+        {
+            using var doc = JsonDocument.Parse(jsonText);
+            var root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Array)
+                return new GeminiBudgetSuggestionResult(false, "Format JSON tidak dikenali.", Array.Empty<BudgetSuggestionRow>(), Raw: jsonText);
+
+            var list = new List<BudgetSuggestionRow>();
+            foreach (var item in root.EnumerateArray())
+            {
+                if (item.ValueKind != JsonValueKind.Object) continue;
+                
+                var cid = item.TryGetProperty("categoryId", out var c) && c.ValueKind == JsonValueKind.Number ? c.GetInt32() : 0;
+                var cname = item.TryGetProperty("categoryName", out var n) ? n.GetString() : "";
+                var amt = item.TryGetProperty("recommendedAmount", out var a) && a.ValueKind == JsonValueKind.Number ? a.GetDecimal() : 0m;
+                var rsn = item.TryGetProperty("reason", out var r) ? r.GetString() : "Saran cerdas dari asisten AI.";
+                
+                if (cid > 0 && amt > 0)
+                {
+                    list.Add(new BudgetSuggestionRow(cid, cname ?? "", amt, rsn ?? ""));
+                }
+            }
+            return new GeminiBudgetSuggestionResult(true, "Saran berhasil dibuat", list);
+        }
+        catch (JsonException ex)
+        {
+            return new GeminiBudgetSuggestionResult(false, "Gagal parse JSON.", Array.Empty<BudgetSuggestionRow>(), Raw: jsonText, Details: ex.Message);
+        }
     }
 
     /// <summary>Decrypts a password-protected PDF in memory using iText7 and returns the decrypted bytes.</summary>

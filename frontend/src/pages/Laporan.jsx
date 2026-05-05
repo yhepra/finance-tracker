@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '../layouts/DashboardLayout'
 import SearchableSelect from '../components/SearchableSelect'
 import DateInputDMY from '../components/DateInputDMY'
+import EditTransactionModalComponent from '../components/EditTransactionModal'
 import * as XLSX from 'xlsx'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
@@ -174,7 +175,7 @@ export default function Laporan() {
     const ws = XLSX.utils.json_to_sheet(data)
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, "Laporan")
-    XLSX.writeFile(wb, `Laporan_FinTrack_${from}_to_${to}.xlsx`)
+    XLSX.writeFile(wb, `Laporan_Alokasi_${from}_to_${to}.xlsx`)
   }
 
   const exportPDF = () => {
@@ -205,7 +206,7 @@ export default function Laporan() {
       headStyles: { fillColor: [79, 70, 229] },
       styles: { fontSize: 8 }
     })
-    doc.save(`Laporan_FinTrack_${from}_to_${to}.pdf`)
+    doc.save(`Laporan_Alokasi_${from}_to_${to}.pdf`)
   }
 
   return (
@@ -480,7 +481,7 @@ export default function Laporan() {
       </DashboardLayout>
       
       {editingTransaction && (
-        <EditTransactionModal 
+        <EditTransactionModalComponent
           transaction={editingTransaction}
           onClose={() => setEditingTransaction(null)}
           onUpdated={() => {
@@ -493,8 +494,8 @@ export default function Laporan() {
       {/* Range Picker Modal */}
       {isRangePickerOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center px-6 transition-all duration-300">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] animate-in fade-in duration-300" onClick={() => setIsRangePickerOpen(false)} />
-          <div className="relative w-full max-w-4xl bg-white rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden range-picker-modal animate-in zoom-in slide-in-from-bottom-4 duration-300">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] animate-in fade-in duration-150" onClick={() => setIsRangePickerOpen(false)} />
+          <div className="relative w-full max-w-4xl bg-white rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden range-picker-modal animate-in zoom-in-95 slide-in-from-bottom-2 duration-150">
             <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
               <div>
                 <div className="text-xl font-black text-slate-900 tracking-tight">Pilih Rentang Laporan</div>
@@ -575,6 +576,147 @@ function InternalRangePicker({ initialFrom, initialTo, onApply, onCancel, format
           >
             Terapkan
           </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function EditTransactionModal({ transaction, onClose, onUpdated }) {
+  const [form, setForm] = useState({
+    description: transaction.description || '',
+    amount: String(Math.abs(Number(transaction.amount) || 0)),
+    date: transaction.date ? String(transaction.date).slice(0, 10) : '',
+    categoryId: transaction.categoryId ? String(transaction.categoryId) : '',
+    type: String(transaction.type ?? 1),
+  })
+  const [categories, setCategories] = useState([])
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    axios.get('/api/categories').then(res => {
+      setCategories(res.data?.data || [])
+    }).catch(() => {})
+  }, [])
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setError('')
+    if (!form.description.trim()) { setError('Deskripsi wajib diisi.'); return }
+    const amount = Number(form.amount)
+    if (!amount || amount <= 0) { setError('Nominal harus lebih dari 0.'); return }
+    setSaving(true)
+    try {
+      await axios.put(`/api/transactions/${transaction.id}`, {
+        description: form.description.trim(),
+        amount,
+        date: form.date ? `${form.date}T00:00:00` : undefined,
+        categoryId: form.categoryId ? Number(form.categoryId) : null,
+        type: Number(form.type),
+        accountId: transaction.accountId,
+      })
+      onUpdated()
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.response?.data?.title || 'Gagal menyimpan.'
+      setError(msg)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center px-6">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] animate-in fade-in duration-150" onClick={onClose} />
+      <div className="relative w-full max-w-xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-2 duration-150">
+        <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
+          <div className="text-lg font-black text-slate-900 tracking-tight">Edit Transaksi</div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-slate-800 hover:border-slate-300 transition-all shadow-sm"
+          >
+            <X size={18} />
+          </button>
+        </div>
+        <div className="p-6">
+          {error && (
+            <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+          )}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Tipe</label>
+                <select
+                  value={form.type}
+                  onChange={e => setForm(p => ({ ...p, type: e.target.value }))}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-800 text-sm font-bold outline-none focus:border-indigo-500"
+                >
+                  <option value="1">Pemasukan</option>
+                  <option value="2">Pengeluaran</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Tanggal</label>
+                <input
+                  type="date"
+                  value={form.date}
+                  onChange={e => setForm(p => ({ ...p, date: e.target.value }))}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-800 text-sm font-bold outline-none focus:border-indigo-500"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Deskripsi</label>
+              <input
+                type="text"
+                value={form.description}
+                onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-800 text-sm font-bold outline-none focus:border-indigo-500"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Nominal</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={form.amount}
+                  onChange={e => setForm(p => ({ ...p, amount: e.target.value }))}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-800 text-sm font-bold outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Kategori</label>
+                <select
+                  value={form.categoryId}
+                  onChange={e => setForm(p => ({ ...p, categoryId: e.target.value }))}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-800 text-sm font-bold outline-none focus:border-indigo-500"
+                >
+                  <option value="">-- Tanpa Kategori --</option>
+                  {categories.map(c => (
+                    <option key={c.id} value={String(c.id)}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-6 py-3 rounded-xl border border-slate-200 text-slate-500 font-bold uppercase tracking-widest text-[10px] hover:bg-slate-50 transition-all"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="px-8 py-3 rounded-xl bg-indigo-600 text-white font-black uppercase tracking-widest text-[10px] hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all disabled:opacity-60"
+              >
+                {saving ? 'Menyimpan...' : 'Simpan Perubahan'}
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </div>

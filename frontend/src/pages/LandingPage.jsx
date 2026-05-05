@@ -4,8 +4,6 @@ import {
     ChevronRight, 
     ShieldCheck, 
     TrendingUp, 
-    PieChart, 
-    Wallet, 
     Zap, 
     Globe, 
     Lock, 
@@ -35,12 +33,10 @@ export default function LandingPage() {
       {/* Navbar */}
       <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-100">
         <div className="container mx-auto px-6 h-20 flex justify-between items-center">
-            <div className="flex items-center space-x-2 group cursor-pointer">
-                <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-200 group-hover:scale-110 transition-transform">
-                    <Wallet size={20} />
-                </div>
-                <span className="text-2xl font-black tracking-tighter">
-                    Fin<span className="text-blue-600">Track</span>
+            <div className="flex items-center gap-3 group cursor-pointer">
+                <img src="/logo-icon.png" alt="Alokasi" className="h-10 w-10 object-contain drop-shadow-sm group-hover:scale-110 transition-transform" />
+                <span className="text-2xl font-black tracking-tighter text-slate-900">
+                    Alokasi
                 </span>
             </div>
             
@@ -210,7 +206,7 @@ export default function LandingPage() {
                 <div>
                     <h2 className="text-4xl md:text-5xl font-black text-slate-900 mb-6 tracking-tighter">Lebih dari sekadar <br/> pelacak uang.</h2>
                     <p className="text-lg text-slate-600 leading-relaxed mb-8">
-                        FinTrack lahir dari visi untuk mendemokratisasi alat manajemen keuangan bagi pengguna personal. Kami mengintegrasikan kecerdasan buatan terbaru untuk membantu Anda mendapatkan wawasan finansial dalam hitungan detik.
+                        Alokasi lahir dari visi untuk mendemokratisasi alat manajemen keuangan bagi pengguna personal. Kami mengintegrasikan kecerdasan buatan terbaru untuk membantu Anda mendapatkan wawasan finansial dalam hitungan detik.
                     </p>
                     <ul className="space-y-4">
                         {[
@@ -281,11 +277,8 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="bg-slate-900 text-white py-20">
         <div className="container mx-auto px-6 text-center">
-            <div className="flex items-center justify-center gap-2 mb-8 opacity-60 grayscale hover:grayscale-0 transition-all">
-                <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white">
-                    <Wallet size={16} />
-                </div>
-                <span className="text-xl font-black tracking-tighter">FinTrack</span>
+            <div className="flex items-center justify-center mb-8 opacity-70 hover:opacity-100 transition-all">
+                <img src="/logo-square.png" alt="Alokasi" className="h-24 object-contain" />
             </div>
             <p className="text-slate-400 text-sm mb-12 max-w-md mx-auto">
                 Dibuat dengan dedikasi tinggi oleh Antigravity untuk membantu masyarakat Indonesia lebih literat secara finansial.
@@ -298,7 +291,7 @@ export default function LandingPage() {
                 <a href="https://www.linkedin.com/in/yhepra/" target="_blank" rel="noreferrer" className="hover:text-blue-400">LinkedIn</a>
             </div>
             <p className="text-xs text-slate-600 font-mono">
-                &copy; {new Date().getFullYear()} FinTrack Personal. Semua Hak Dilindungi.
+                &copy; {new Date().getFullYear()} Alokasi. Semua Hak Dilindungi.
             </p>
         </div>
       </footer>

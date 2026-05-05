@@ -15,7 +15,7 @@ const contentByType = {
         body: (
           <>
             <Paragraph>
-              Dengan menggunakan FinTrack, Anda setuju mengikuti syarat ini. Jika tidak setuju, hentikan penggunaan layanan.
+              Dengan menggunakan Alokasi, Anda setuju mengikuti syarat ini. Jika tidak setuju, hentikan penggunaan layanan.
             </Paragraph>
             <List>
               <li>Anda bertanggung jawab atas aktivitas akun Anda.</li>
@@ -43,7 +43,7 @@ const contentByType = {
           <>
             <List>
               <li>Anda tetap pemilik data yang Anda unggah/masukkan.</li>
-              <li>Anda memberi izin kepada FinTrack untuk memproses data agar fitur bekerja (misalnya, scan PDF, analitik, laporan).</li>
+              <li>Anda memberi izin kepada Alokasi untuk memproses data agar fitur bekerja (misalnya, scan PDF, analitik, laporan).</li>
               <li>Anda tidak boleh mengunggah file yang mengandung program berbahaya atau mengganggu sistem.</li>
             </List>
           </>
@@ -54,7 +54,7 @@ const contentByType = {
         body: (
           <>
             <Paragraph>
-              FinTrack membantu pencatatan dan analitik, namun bukan pengganti nasihat profesional. Kami tidak menjamin hasil AI selalu 100% akurat. Penggunaan layanan ini sepenuhnya menjadi risiko Anda.
+              Alokasi membantu pencatatan dan analitik, namun bukan pengganti nasihat profesional. Kami tidak menjamin hasil AI selalu 100% akurat. Penggunaan layanan ini sepenuhnya menjadi risiko Anda.
             </Paragraph>
           </>
         ),
@@ -93,7 +93,7 @@ const contentByType = {
         body: (
           <>
             <Paragraph>
-              FinTrack menerapkan langkah-langkah keamanan untuk melindungi data Anda. Akses dilindungi dengan autentikasi, dan data
+              Alokasi menerapkan langkah-langkah keamanan untuk melindungi data Anda. Akses dilindungi dengan autentikasi, dan data
               hanya dipakai untuk kebutuhan layanan.
             </Paragraph>
           </>

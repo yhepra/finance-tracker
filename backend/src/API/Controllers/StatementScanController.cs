@@ -16,16 +16,18 @@ public class StatementScanController : ControllerBase
 {
     private readonly TransactionGeminiScanService _scan;
     private readonly AppDbContext _db;
+    private readonly FinanceTracker.Application.Interfaces.ILogService _log;
 
     private static readonly HashSet<string> SupportedBanks = new(StringComparer.OrdinalIgnoreCase)
     {
-        "BCA", "BNI", "SUPERBANK"
+        "BCA", "BNI", "SUPERBANK", "JAGO"
     };
 
-    public StatementScanController(TransactionGeminiScanService scan, AppDbContext db)
+    public StatementScanController(TransactionGeminiScanService scan, AppDbContext db, FinanceTracker.Application.Interfaces.ILogService log)
     {
         _scan = scan;
         _db = db;
+        _log = log;
     }
 
     [HttpPost("preview")]
@@ -71,6 +73,13 @@ public class StatementScanController : ControllerBase
                     result.StatementMonth.Value);
             }
 
+            await _log.LogInfoAsync(
+                "Scan",
+                $"Preview scan rekening: {bankCodeNormalized} ({result.Transactions.Count} transaksi)",
+                $"Bank={bankCodeNormalized}, OpeningBalance={(result.OpeningBalance.HasValue ? result.OpeningBalance.Value.ToString() : "null")}, Year={(result.StatementYear.HasValue ? result.StatementYear.Value.ToString() : "null")}, Month={(result.StatementMonth.HasValue ? result.StatementMonth.Value.ToString() : "null")}",
+                userId.Value
+            );
+
             return Ok(new
             {
                 data = result.Transactions,
@@ -84,14 +93,17 @@ public class StatementScanController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
+            await _log.LogWarningAsync("Scan", $"Scan rekening gagal: {bankCodeNormalized}", ex.Message, userId.Value);
             return BadRequest(new { message = ex.Message });
         }
         catch (OperationCanceledException)
         {
+            await _log.LogWarningAsync("Scan", $"Scan rekening dibatalkan: {bankCodeNormalized}", null, userId.Value);
             return BadRequest(new { message = "Permintaan dibatalkan." });
         }
         catch (Exception ex)
         {
+            await _log.LogErrorAsync("Scan", $"Scan rekening error: {bankCodeNormalized}", ex.Message, userId.Value, ex.ToString());
             return StatusCode(500, new { message = "Terjadi kesalahan saat scan rekening.", details = ex.Message });
         }
     }

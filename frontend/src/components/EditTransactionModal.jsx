@@ -107,9 +107,9 @@ export default function EditTransactionModal({ transaction, onClose, onUpdated }
   if (!transaction) return null;
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 transition-all duration-300">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] animate-in fade-in duration-300" onClick={onClose} />
-      <div className="relative bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in slide-in-from-bottom-4 duration-300">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] animate-in fade-in duration-150" onClick={onClose} />
+      <div className="relative bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 slide-in-from-bottom-2 duration-150">
         <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100 bg-slate-50/50">
           <h2 className="text-xl font-black text-slate-900 tracking-tight">Edit Transaksi</h2>
           <button 

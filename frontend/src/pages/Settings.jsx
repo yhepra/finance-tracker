@@ -874,7 +874,7 @@ export default function Settings() {
             { key: 'banks', label: t('settings.banks', 'Bank'), icon: LayoutGrid, meta: String(banks.length), group: 'data' },
             { key: 'integrations', label: t('settings.integrations', 'Integrasi'), icon: Share2, group: 'integrations' },
             isAdmin && { key: 'smtp', label: 'SMTP Config', icon: Mail, group: 'integrations' },
-            { key: 'about', label: 'About FinTrack', icon: Info, group: 'about' },
+            { key: 'about', label: 'About Alokasi', icon: Info, group: 'about' },
           ].filter(Boolean)
 
           const q = menuQuery.trim().toLowerCase()
@@ -892,7 +892,7 @@ export default function Settings() {
             isAdmin && { tab: 'smtp', anchor: 'smtp', title: 'SMTP > Test kirim email', desc: 'Coba kirim email simulasi ke alamat Anda.', keywords: ['test', 'check', 'cek', 'koneksi', 'smtp', 'kirim email', 'percobaan'] },
             { tab: 'categories', anchor: 'categories', title: 'Kategori > Kelola kategori', desc: 'List kategori pemasukan & pengeluaran.', keywords: ['kategori', 'category', 'pemasukan', 'pengeluaran', 'edit kategori', 'hapus kategori'] },
             { tab: 'banks', anchor: 'banks', title: 'Bank > Kelola daftar bank', desc: 'Manajemen rekening bank dan status aktif.', keywords: ['bank', 'rekening', 'bca', 'mandiri', 'bni', 'bri', 'tambah bank', 'aktif bank'] },
-            { tab: 'about', anchor: 'about', title: 'About > Tentang FinTrack', desc: 'Detail versi dan informasi pengembang.', keywords: ['about', 'tentang', 'fintrack', 'versi', 'aplikasi'] },
+            { tab: 'about', anchor: 'about', title: 'About > Tentang Alokasi', desc: 'Detail versi dan informasi pengembang.', keywords: ['about', 'tentang', 'alokasi', 'versi', 'aplikasi'] },
           ].filter(Boolean)
           const searchResults =
             q.length === 0
@@ -1072,7 +1072,7 @@ export default function Settings() {
                         ? 'Kelola integrasi pihak ketiga seperti Gemini.'
                         : tab === 'smtp'
                         ? 'Konfigurasi Email SMTP untuk Forgot Password.'
-                        : 'Informasi mengenai aplikasi FinTrack.'}
+                        : 'Informasi mengenai aplikasi Alokasi.'}
                     </p>
                   </div>
 
@@ -1964,10 +1964,10 @@ export default function Settings() {
                   </>
                 ) : (
                   <div id="about" className="mt-6 bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
-                    <div className="text-2xl font-extrabold text-slate-900 tracking-tight">About FinTrack</div>
+                    <div className="text-2xl font-extrabold text-slate-900 tracking-tight">About Alokasi</div>
                     <div className="mt-3 text-slate-600 leading-relaxed space-y-3">
                       <p>
-                        FinTrack adalah aplikasi personal finance untuk membantu kamu mencatat transaksi, memantau saldo bulanan,
+                        Alokasi adalah aplikasi personal finance untuk membantu kamu mencatat transaksi, memantau saldo bulanan,
                         dan melihat ringkasan keuangan dalam satu dashboard.
                       </p>
                       <p>
@@ -1975,7 +1975,7 @@ export default function Settings() {
                         per rekening, upload/scan mutasi, kategorisasi transaksi, laporan, dan pengaturan master (kategori, bank).
                       </p>
                       <p>
-                        FinTrack juga mendukung integrasi AI (Gemini Vision) agar dokumen bank bisa dibaca dan dianalisis otomatis.
+                        Alokasi juga mendukung integrasi AI (Gemini Vision) agar dokumen bank bisa dibaca dan dianalisis otomatis.
                         API key disimpan terenkripsi di database, dan aplikasi hanya menampilkan 4 karakter terakhir sebagai indikator.
                       </p>
                       <p className="text-sm text-slate-500">
@@ -2196,7 +2196,7 @@ export default function Settings() {
                 <li>Klik menu <span className="font-bold text-slate-900">"Get API key"</span> di baris kiri.</li>
                 <li>Pilih <span className="font-bold text-slate-900">"Create API key in new project"</span>.</li>
                 <li>Salin API key yang muncul (biasanya diawali dengan <code className="bg-white px-1.5 py-0.5 rounded border">AIza...</code>).</li>
-                <li>Kembali ke FinTrack dan simpan key tersebut di menu Integrasi.</li>
+                <li>Kembali ke Alokasi dan simpan key tersebut di menu Integrasi.</li>
               </ol>
             </div>
             <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl">
@@ -2205,7 +2205,7 @@ export default function Settings() {
                 <div>
                   <div className="text-xs font-bold text-amber-800 mb-1">Penting</div>
                   <p className="text-xs text-amber-700 leading-relaxed">
-                    API Key ini GRATIS (dengan batas penggunaan wajar). Jangan bagikan key Anda kepada siapapun. FinTrack akan menyimpan key ini dengan enkripsi aman di database Anda.
+                    API Key ini GRATIS (dengan batas penggunaan wajar). Jangan bagikan key Anda kepada siapapun. Alokasi akan menyimpan key ini dengan enkripsi aman di database Anda.
                   </p>
                 </div>
               </div>

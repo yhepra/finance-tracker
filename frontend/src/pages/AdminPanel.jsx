@@ -30,9 +30,10 @@ export default function AdminPanel() {
         }
     }, [role, navigate]);
 
-    const [activeView, setActiveView] = useState(null); // null, 'users', 'feedback'
+    const [activeView, setActiveView] = useState(null); // null, 'users', 'feedback', 'logs'
     const [users, setUsers] = useState([]);
     const [feedbacks, setFeedbacks] = useState([]);
+    const [logs, setLogs] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
 
@@ -59,6 +60,20 @@ export default function AdminPanel() {
             setActiveView('feedback');
         } catch {
             setError('Gagal memuat feedback.');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const loadLogs = async () => {
+        setIsLoading(true);
+        setError('');
+        try {
+            const res = await axios.get('/api/admin/logs');
+            setLogs(res.data.data || []);
+            setActiveView('logs');
+        } catch {
+            setError('Gagal memuat log aktivitas.');
         } finally {
             setIsLoading(false);
         }
@@ -101,6 +116,13 @@ export default function AdminPanel() {
             icon: <MessageSquare className="text-emerald-600" size={32} />,
             action: loadFeedbacks,
             color: 'bg-emerald-50'
+        },
+        {
+            title: 'Log Aktivitas',
+            desc: 'Pantau log transaksi, system event, dan error log secara real-time.',
+            icon: <Clock className="text-rose-600" size={32} />,
+            action: loadLogs,
+            color: 'bg-rose-50'
         }
     ];
 
@@ -113,7 +135,7 @@ export default function AdminPanel() {
                     </div>
                     <div>
                         <h1 className="text-3xl font-black text-slate-900 tracking-tight">Admin Control Panel</h1>
-                        <p className="text-slate-500 font-medium">Pusat kendali data master dan konfigurasi sistem FinTrack.</p>
+                        <p className="text-slate-500 font-medium">Pusat kendali data master dan konfigurasi sistem Alokasi.</p>
                     </div>
                 </div>
 
@@ -147,15 +169,27 @@ export default function AdminPanel() {
                         {/* Modal Header */}
                         <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                             <div className="flex items-center gap-4">
-                                <div className={`p-3 rounded-2xl ${activeView === 'users' ? 'bg-amber-100/50 text-amber-600' : 'bg-emerald-100/50 text-emerald-600'}`}>
-                                    {activeView === 'users' ? <Users size={24} /> : <MessageSquare size={24} />}
+                                <div className={`p-3 rounded-2xl ${
+                                    activeView === 'users' ? 'bg-amber-100/50 text-amber-600' : 
+                                    activeView === 'logs' ? 'bg-rose-100/50 text-rose-600' :
+                                    'bg-emerald-100/50 text-emerald-600'
+                                }`}>
+                                    {activeView === 'users' ? <Users size={24} /> : 
+                                     activeView === 'logs' ? <Clock size={24} /> :
+                                     <MessageSquare size={24} />}
                                 </div>
                                 <div>
                                     <h2 className="text-xl font-black text-slate-900 leading-none">
-                                        {activeView === 'users' ? 'User Management' : 'Daftar Umpan Balik'}
+                                        {activeView === 'users' ? 'User Management' : 
+                                         activeView === 'logs' ? 'Activity & Error Log' :
+                                         'Daftar Umpan Balik'}
                                     </h2>
                                     <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mt-1.5 flex items-center gap-1.5">
-                                        Total: {activeView === 'users' ? users.length : feedbacks.length} data
+                                        Total: {
+                                            activeView === 'users' ? users.length : 
+                                            activeView === 'logs' ? logs.length :
+                                            feedbacks.length
+                                        } data
                                     </p>
                                 </div>
                             </div>
@@ -221,6 +255,61 @@ export default function AdminPanel() {
                                                     </td>
                                                 </tr>
                                             ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            ) : activeView === 'logs' ? (
+                                <div className="rounded-2xl border border-slate-100 overflow-hidden">
+                                    <table className="w-full text-left border-collapse bg-white">
+                                        <thead className="bg-slate-50 text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
+                                            <tr>
+                                                <th className="p-4">Time</th>
+                                                <th className="p-4">Level & Cat</th>
+                                                <th className="p-4">User</th>
+                                                <th className="p-4">Message / IP</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-50">
+                                            {logs.map(l => (
+                                                <tr key={l.id} className="hover:bg-slate-50/50 transition-colors">
+                                                    <td className="p-4 whitespace-nowrap">
+                                                        <div className="text-xs font-bold text-slate-900">{new Date(l.createdAtUtc).toLocaleDateString()}</div>
+                                                        <div className="text-[10px] text-slate-400 font-medium">
+                                                            {new Date(l.createdAtUtc).toLocaleTimeString()}
+                                                        </div>
+                                                    </td>
+                                                    <td className="p-4">
+                                                        <div className="flex items-center gap-1.5 mb-1">
+                                                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase ${
+                                                                l.level === 'Error' ? 'bg-red-100 text-red-700' :
+                                                                l.level === 'Warning' ? 'bg-amber-100 text-amber-700' :
+                                                                'bg-blue-100 text-blue-700'
+                                                            }`}>
+                                                                {l.level}
+                                                            </span>
+                                                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">
+                                                                {l.category}
+                                                            </span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="p-4">
+                                                        <div className="text-xs font-bold text-slate-700 truncate max-w-[120px]">{l.userFullName || l.userEmail}</div>
+                                                        <div className="text-[9px] text-slate-400 font-mono tracking-tighter">{l.userEmail}</div>
+                                                    </td>
+                                                    <td className="p-4">
+                                                        <div className="text-xs text-slate-900 font-medium mb-1 line-clamp-2" title={l.message}>
+                                                            {l.message}
+                                                        </div>
+                                                        {l.ipAddress && (
+                                                            <div className="text-[9px] text-slate-400 font-mono flex items-center gap-1">
+                                                                <Zap size={8} />
+                                                                {l.ipAddress}
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            {!logs.length && <tr><td colSpan="4" className="p-10 text-center font-bold text-slate-400 uppercase tracking-widest text-xs">Belum ada log tercatat.</td></tr>}
                                         </tbody>
                                     </table>
                                 </div>

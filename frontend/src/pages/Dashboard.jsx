@@ -7,12 +7,14 @@ import BudgetProgressCard from '../components/cards/BudgetProgressCard';
 import DebtReceivablesCard from '../components/cards/DebtReceivablesCard';
 import QuickScanCard from '../components/cards/QuickScanCard';
 import YearlyCashFlowCard from '../components/cards/YearlyCashFlowCard';
+import MonthlyBudgetSummaryCard from '../components/cards/MonthlyBudgetSummaryCard';
 import DashboardLayout from '../layouts/DashboardLayout';
 
 const DEFAULT_WIDGETS = {
     yearlyChart: { id: 'yearlyChart', label: 'Arus Kas Tahunan', visible: true, colSpan: 2 },
     reconciliation: { id: 'reconciliation', label: 'Status Saldo', visible: true, colSpan: 1 },
     budget: { id: 'budget', label: 'Progres Anggaran', visible: true, colSpan: 1 },
+    monthlyBudget: { id: 'monthlyBudget', label: 'Anggaran Bulan Ini', visible: true, colSpan: 1 },
     debt: { id: 'debt', label: 'Hutang & Piutang', visible: true, colSpan: 1 },
     scan: { id: 'scan', label: 'Scan Rekening', visible: true, colSpan: 1 }
 };
@@ -129,6 +131,7 @@ const Dashboard = () => {
                     {widgets.yearlyChart.visible && <YearlyCashFlowCard data={stats?.yearlyCashFlow} />}
                     {widgets.reconciliation.visible && <ReconciliationCard stats={stats?.reconciliation} />}
                     {widgets.budget.visible && <BudgetProgressCard budgets={stats?.budgetProgresses} />}
+                    {widgets.monthlyBudget?.visible && <MonthlyBudgetSummaryCard />}
                     {widgets.debt.visible && <DebtReceivablesCard stats={stats?.debtReceivables} />}
                     {widgets.scan.visible && <QuickScanCard />}
                 </div>

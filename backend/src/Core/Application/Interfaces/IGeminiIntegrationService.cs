@@ -19,6 +19,15 @@ public interface IGeminiIntegrationService
         string bankCode,
         string? pdfPassword = null,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// AI Budget Suggestion based on income and previous transactions.
+    /// </summary>
+    Task<GeminiBudgetSuggestionResult> SuggestBudgetsAsync(
+        int userId, 
+        decimal income, 
+        IReadOnlyList<dynamic> recentTransactions, 
+        CancellationToken cancellationToken = default);
 }
 
 public record GeminiTestResult(bool Success, string Message, string? Raw = null, string? Details = null);
@@ -33,3 +42,16 @@ public record GeminiStatementScanResult(
     string? AccountNumber = null,
     string? Raw = null,
     string? Details = null);
+
+public record GeminiBudgetSuggestionResult(
+    bool Success,
+    string Message,
+    IReadOnlyList<BudgetSuggestionRow> Suggestions,
+    string? Raw = null,
+    string? Details = null);
+
+public record BudgetSuggestionRow(
+    int CategoryId,
+    string CategoryName,
+    decimal RecommendedAmount,
+    string Reason);

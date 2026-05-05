@@ -3,6 +3,7 @@ import { ArrowRightLeft, Plus, Trash2, TrendingDown, TrendingUp, History, X } fr
 import axios from 'axios'
 import DashboardLayout from '../layouts/DashboardLayout'
 import SearchableSelect from '../components/SearchableSelect'
+import DateInputDMY from '../components/DateInputDMY'
 
 const formatRp = (value) => {
   return new Intl.NumberFormat('id-ID', {
@@ -10,6 +11,21 @@ const formatRp = (value) => {
     currency: 'IDR',
     maximumFractionDigits: 0,
   }).format(value)
+}
+
+const formatDate = (date) => {
+  if (!date) return '-'
+  const d = date instanceof Date ? date : new Date(date)
+  if (Number.isNaN(d.getTime())) return '-'
+  
+  const dateFormat = localStorage.getItem('prefs_dateFormat') || 'DMY'
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  
+  if (dateFormat === 'YMD') return `${y}-${m}-${dd}`
+  if (dateFormat === 'MDY') return `${m}/${dd}/${y}`
+  return `${dd}/${m}/${y}`
 }
 
 function toInputDateString(d) {
@@ -48,6 +64,7 @@ export default function HutangPiutang() {
   
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const [historyTarget, setHistoryTarget] = useState(null)
+  const [confirmDelete, setConfirmDelete] = useState(null) // item to delete
 
   useEffect(() => {
     let mounted = true
@@ -247,6 +264,12 @@ export default function HutangPiutang() {
     }
   }
 
+  const handleConfirmDelete = async () => {
+    if (!confirmDelete) return
+    await removeItem(confirmDelete.id)
+    setConfirmDelete(null)
+  }
+
   return (
     <>
       <DashboardLayout>
@@ -368,7 +391,7 @@ export default function HutangPiutang() {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {filteredItems.map((it) => {
-                      const due = it?.dueDate ? String(it.dueDate).slice(0, 10) : '-'
+                      const due = formatDate(it?.dueDate)
                       const isPaid = it?.status === 'paid'
                       const isPiutang = it?.kind === 'piutang'
                       const itPaid = Number(it?.paidAmount) || 0
@@ -434,7 +457,7 @@ export default function HutangPiutang() {
                               )}
                               <button
                                 type="button"
-                                onClick={() => removeItem(it.id)}
+                                onClick={() => setConfirmDelete(it)}
                                 className="inline-flex items-center justify-center h-9 w-9 rounded-xl border border-slate-200 text-slate-600 hover:bg-rose-50 hover:text-rose-600 transition-all"
                                 aria-label="Hapus"
                               >
@@ -508,10 +531,9 @@ export default function HutangPiutang() {
 
             <div>
               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Jatuh Tempo (opsional)</label>
-              <input
-                type="date"
+              <DateInputDMY
                 value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
+                onChange={setDueDate}
                 className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -574,10 +596,9 @@ export default function HutangPiutang() {
             </div>
             <div>
               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Tanggal bayar</label>
-              <input
-                type="date"
+              <DateInputDMY
                 value={paymentDate}
-                onChange={(e) => setPaymentDate(e.target.value)}
+                onChange={setPaymentDate}
                 className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -658,7 +679,7 @@ export default function HutangPiutang() {
                       <div className="flex justify-between items-start gap-4">
                         <div>
                           <div className="text-sm font-black text-slate-800">{formatRp(p.amount)}</div>
-                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{new Date(p.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{formatDate(p.date)}</div>
                           {p.notes && (
                             <div className="mt-1.5 p-2 bg-slate-50 rounded-lg text-xs text-slate-600 border border-slate-100">
                               {p.notes}
@@ -682,6 +703,42 @@ export default function HutangPiutang() {
           </div>
         </div>
       )}
+      {/* Delete Confirmation Modal */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center px-6">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] animate-in fade-in duration-150" onClick={() => setConfirmDelete(null)} />
+          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-2 duration-150">
+            <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
+              <div className="text-lg font-black text-slate-900 tracking-tight">Hapus Data</div>
+              <button onClick={() => setConfirmDelete(null)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-slate-800 transition-all shadow-sm">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-6">
+              <p className="text-sm text-slate-600 mb-1">
+                Yakin ingin menghapus {confirmDelete.kind === 'piutang' ? 'piutang' : 'hutang'} kepada <span className="font-black text-slate-900">{confirmDelete.counterparty}</span>?
+              </p>
+              <p className="text-xs text-slate-400 mb-6">Seluruh riwayat pembayaran juga akan ikut terhapus dan tidak dapat dikembalikan.</p>
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(null)}
+                  className="px-6 py-3 rounded-xl border border-slate-200 text-slate-500 font-bold uppercase tracking-widest text-[10px] hover:bg-slate-50 transition-all"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDelete}
+                  className="px-8 py-3 rounded-xl bg-rose-600 text-white font-black uppercase tracking-widest text-[10px] hover:bg-rose-700 shadow-lg shadow-rose-100 transition-all"
+                >
+                  Ya, Hapus
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
@@ -690,8 +747,8 @@ function Modal({ open, title, children, onClose, maxWidth = 'max-w-2xl' }) {
   if (!open) return null
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center px-6 transition-all duration-300">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] animate-in fade-in duration-300" onClick={onClose} />
-      <div className={`relative w-full ${maxWidth} bg-white rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in slide-in-from-bottom-4 duration-300`}>
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] animate-in fade-in duration-150" onClick={onClose} />
+        <div className={`relative w-full ${maxWidth} bg-white rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-2 duration-150`}>
         <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
           <div className="text-xl font-black text-slate-900 tracking-tight">{title}</div>
           <button

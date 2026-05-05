@@ -6,12 +6,15 @@ const formatK = (value) => {
 };
 
 const BudgetProgressCard = ({ budgets }) => {
-    if (!budgets || budgets.length === 0) return null;
-
     return (
         <div className="bg-white p-6 rounded-2xl shadow-[0_4px_6px_rgba(0,0,0,0.07)] flex flex-col h-full border border-slate-100">
             <h3 className="font-bold text-slate-800 text-lg mb-6">Pengeluaran vs Anggaran</h3>
             
+            {(!budgets || budgets.length === 0) ? (
+                <div className="flex-1 flex flex-col items-center justify-center text-slate-400 py-8">
+                    <p className="text-sm font-medium">Belum ada anggaran rutinan</p>
+                </div>
+            ) : (
             <div className="flex flex-col gap-6 flex-1 justify-center">
                 {budgets.map((budget, index) => {
                     const hasBudget = (budget.budgetedAmount ?? 0) > 0;
@@ -40,6 +43,8 @@ const BudgetProgressCard = ({ budgets }) => {
                     );
                 })}
             </div>
+            
+            )}
             
             <div className="mt-6 flex justify-between text-xs text-slate-500 font-medium">
                 <span>* Berdasarkan alokasi bulanan</span>

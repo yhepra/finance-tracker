@@ -1,0 +1,68 @@
+services:
+  # ── MySQL Database ──────────────────────────────────
+  db:
+    image: mysql:8.0
+    container_name: financetracker-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-financetracker}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-FinanceTrackerDb}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-financetracker}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - financetracker-net
+
+  # ── Backend (.NET 10 API) ───────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: financetracker-backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__DefaultConnection: "Server=db;Database=${MYSQL_DATABASE:-FinanceTrackerDb};Uid=root;Pwd=${MYSQL_ROOT_PASSWORD:-financetracker};"
+      Jwt__Key: ${JWT_KEY:-super-secret-jwt-key-change-this-in-production-min-32-chars!}
+      Jwt__Issuer: ${JWT_ISSUER:-FinanceTracker}
+      Jwt__Audience: ${JWT_AUDIENCE:-FinanceTracker}
+      OAuth__Google__ClientId: ${GOOGLE_CLIENT_ID:-}
+    ports:
+      - "5116:5116"
+    networks:
+      - financetracker-net
+
+  # ── Frontend (React + Nginx) ────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
+        VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+    container_name: financetracker-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    networks:
+      - financetracker-net
+
+volumes:
+  mysql_data:
+    driver: local
+
+networks:
+  financetracker-net:
+    driver: bridge

@@ -14,6 +14,10 @@ public class BanksController : ControllerBase
 {
     private readonly AppDbContext _db;
     private readonly IEnumerable<IBankStatementParser> _parsers;
+    private static readonly HashSet<string> AiSupportedBanks = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "BCA", "BNI", "SUPERBANK", "JAGO"
+    };
 
     public BanksController(AppDbContext db, IEnumerable<IBankStatementParser> parsers)
     {
@@ -42,7 +46,7 @@ public class BanksController : ControllerBase
                 x.Code,
                 x.Name,
                 x.IsActive,
-                _parsers.Any(p => p.CanParse(x.Code)),
+                _parsers.Any(p => p.CanParse(x.Code)) || AiSupportedBanks.Contains(x.Code),
                 x.CreatedAtUtc
             ))
             .ToList();
@@ -101,7 +105,7 @@ public class BanksController : ControllerBase
                 entity.Code,
                 entity.Name,
                 entity.IsActive,
-                _parsers.Any(p => p.CanParse(entity.Code)),
+                _parsers.Any(p => p.CanParse(entity.Code)) || AiSupportedBanks.Contains(entity.Code),
                 entity.CreatedAtUtc
             )
         });
@@ -142,7 +146,7 @@ public class BanksController : ControllerBase
                 entity.Code,
                 entity.Name,
                 entity.IsActive,
-                _parsers.Any(p => p.CanParse(entity.Code)),
+                _parsers.Any(p => p.CanParse(entity.Code)) || AiSupportedBanks.Contains(entity.Code),
                 entity.CreatedAtUtc
             )
         });
@@ -164,4 +168,3 @@ public class BanksController : ControllerBase
     public record UpdateBankRequest(string? Name, bool? IsActive);
     public record BankRowDto(int Id, string Code, string Name, bool IsActive, bool IsSupported, DateTime CreatedAtUtc);
 }
-

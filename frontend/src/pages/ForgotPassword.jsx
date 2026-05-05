@@ -54,7 +54,7 @@ export default function ForgotPassword() {
         </div>
 
         <div className="relative z-10 text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-12">
-          <span>&copy; {new Date().getFullYear()} FinTrack Personal</span>
+          <span>&copy; {new Date().getFullYear()} Alokasi</span>
         </div>
       </div>
 

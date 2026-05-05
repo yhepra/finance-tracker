@@ -38,11 +38,15 @@ export default function GoogleSignInButton({ onCredential, label = 'Lanjut denga
         shape: 'pill',
         width: 360,
       })
+
+      // Enable Google One Tap
+      google.prompt()
     }
 
     tryInit()
     return () => {
       canceled = true
+      window.google?.accounts?.id?.cancel()
     }
   }, [clientId, onCredential])
 

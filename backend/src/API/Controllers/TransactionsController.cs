@@ -19,12 +19,14 @@ public class TransactionsController : ControllerBase
     private readonly TransactionUploadService _uploadService;
     private readonly TransactionGeminiScanService _geminiScan;
     private readonly AppDbContext _db;
+    private readonly ILogService _log;
 
-    public TransactionsController(TransactionUploadService uploadService, TransactionGeminiScanService geminiScan, AppDbContext db)
+    public TransactionsController(TransactionUploadService uploadService, TransactionGeminiScanService geminiScan, AppDbContext db, ILogService log)
     {
         _uploadService = uploadService;
         _geminiScan = geminiScan;
         _db = db;
+        _log = log;
     }
 
     [HttpGet("categories")]
@@ -182,10 +184,23 @@ public class TransactionsController : ControllerBase
     [HttpPost("confirm")]
     public async Task<IActionResult> ConfirmTransactions([FromBody] System.Collections.Generic.IEnumerable<FinanceTracker.Application.DTOs.TransactionPreviewDto> transactions, [FromQuery] int accountId = 1)
     {
+        var userId = GetUserId();
+        if (userId == null) return Unauthorized(new { message = "Unauthorized." });
+
         if (transactions == null)
             return BadRequest("No transactions provided.");
 
-        await _uploadService.ProcessConfirmedTransactionsAsync(transactions, accountId);
+        var ownsAccount = await _db.Accounts.AnyAsync(a => a.Id == accountId && a.UserId == userId.Value);
+        if (!ownsAccount) return BadRequest(new { message = "Akun tidak valid." });
+
+        var txList = transactions.ToList();
+        await _uploadService.ProcessConfirmedTransactionsAsync(userId.Value, txList, accountId);
+
+        await _log.LogTransactionAsync(
+            userId.Value,
+            $"Simpan transaksi (confirm): {txList.Count} baris",
+            $"AccountId={accountId}"
+        );
         
         return Ok(new { message = "Transactions uploaded and processed successfully." });
     }
@@ -253,6 +268,12 @@ public class TransactionsController : ControllerBase
 
         await _db.SaveChangesAsync();
 
+        await _log.LogTransactionAsync(
+            userId.Value,
+            "Update transaksi",
+            $"TransactionId={id}, AccountId={dto.AccountId}, Amount={dto.Amount}, Type={dto.Type}, CategoryId={(dto.CategoryId.HasValue ? dto.CategoryId.Value.ToString() : "null")}"
+        );
+
         return Ok(new { message = "Transaksi berhasil diperbarui." });
     }
 
@@ -269,6 +290,12 @@ public class TransactionsController : ControllerBase
 
         _db.Transactions.Remove(t);
         await _db.SaveChangesAsync();
+
+        await _log.LogTransactionAsync(
+            userId.Value,
+            "Hapus transaksi",
+            $"TransactionId={id}, AccountId={t.AccountId}, Amount={t.Amount}, Type={t.Type}, CategoryId={(t.CategoryId.HasValue ? t.CategoryId.Value.ToString() : "null")}"
+        );
 
         return Ok(new { message = "Transaksi berhasil dihapus." });
     }

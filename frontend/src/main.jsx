@@ -5,6 +5,7 @@ import './index.css'
 import App from './App.jsx'
 import { refreshI18n } from './i18n'
 import { getApiBaseUrl } from './config/env'
+import { ToastProvider } from './context/ToastContext.jsx'
 
 axios.defaults.baseURL = getApiBaseUrl()
 axios.interceptors.request.use((config) => {
@@ -25,6 +26,8 @@ window.addEventListener('auth-updated', () => {
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <App />
+    <ToastProvider>
+      <App />
+    </ToastProvider>
   </StrictMode>,
 )

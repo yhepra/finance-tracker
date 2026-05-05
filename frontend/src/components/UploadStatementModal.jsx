@@ -7,14 +7,43 @@ export default function UploadStatementModal({ isOpen, onClose }) {
   const [step, setStep] = useState('upload'); // 'upload', 'preview', 'success'
   const [file, setFile] = useState(null);
   const [bankCode, setBankCode] = useState('BCA');
-  const [useAi, setUseAi] = useState(false);
+  const [pdfPassword, setPdfPassword] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [banks, setBanks] = useState([]);
+  const [accounts, setAccounts] = useState([]);
+  const [accountId, setAccountId] = useState(null);
+  const [categories, setCategories] = useState([]);
   const [bankError, setBankError] = useState('');
   
   // Data for preview table
   const [previewData, setPreviewData] = useState([]);
   const numberLocale = localStorage.getItem('prefs_numberLocale') || 'id-ID';
+  const isBni = String(bankCode).toUpperCase() === 'BNI';
+
+  const categoryOptions = useMemo(() => {
+    return categories.map((c) => ({ value: String(c.id), label: c.name }));
+  }, [categories]);
+
+  const categoryById = useMemo(() => {
+    const map = {};
+    categories.forEach((c) => {
+      map[String(c.id)] = c;
+    });
+    return map;
+  }, [categories]);
+
+  const categoryByName = useMemo(() => {
+    const map = {};
+    categories.forEach((c) => {
+      map[String(c.name || '').trim().toLowerCase()] = c;
+    });
+    return map;
+  }, [categories]);
+
+  const newTempId = () => {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  };
 
   useEffect(() => {
     if (!isOpen) return;
@@ -22,10 +51,18 @@ export default function UploadStatementModal({ isOpen, onClose }) {
     const load = async () => {
       setBankError('');
       try {
-        const res = await axios.get('/api/banks?active=true');
-        const data = Array.isArray(res?.data?.data) ? res.data.data : [];
+        const [banksRes, accountsRes, categoriesRes] = await Promise.all([
+          axios.get('/api/banks?active=true'),
+          axios.get('/api/accounts'),
+          axios.get('/api/categories'),
+        ]);
+
+        const data = Array.isArray(banksRes?.data?.data) ? banksRes.data.data : [];
         if (!mounted) return;
         setBanks(data);
+        setAccounts(Array.isArray(accountsRes?.data?.data) ? accountsRes.data.data : []);
+        setCategories(Array.isArray(categoriesRes?.data?.data) ? categoriesRes.data.data : []);
+
         const prefBankId = localStorage.getItem('prefs_defaultBankId');
         const preferredByPref =
           prefBankId ? data.find((x) => String(x?.id) === String(prefBankId))?.code : null;
@@ -48,6 +85,13 @@ export default function UploadStatementModal({ isOpen, onClose }) {
     };
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!accounts.length || !bankCode) return;
+    const match = accounts.find((a) => String(a.bankCode).toUpperCase() === String(bankCode).toUpperCase());
+    if (match) setAccountId(match.id);
+    else setAccountId(null);
+  }, [bankCode, accounts]);
+
   const bankOptions = useMemo(() => {
     return banks.slice().sort((a, b) => {
       const sa = a?.isSupported ? 1 : 0;
@@ -67,27 +111,45 @@ export default function UploadStatementModal({ isOpen, onClose }) {
     setIsProcessing(true);
     
     try {
+      if (!accountId) {
+        throw new Error('Belum ada rekening/akun yang terhubung ke bank ini. Buat rekening dulu di menu Rekening.');
+      }
+      if (isBni && !pdfPassword.trim()) {
+        throw new Error('Rekening koran BNI biasanya terenkripsi. Masukkan password PDF Anda (biasanya tanggal lahir: DDMMYYYY).');
+      }
+
       // Create FormData
       const formData = new FormData();
       formData.append('file', file);
       formData.append('bankCode', bankCode);
-      const endpoint = useAi ? '/api/transactions/preview-ai?accountId=1' : '/api/transactions/preview?accountId=1';
-      const res = await axios.post(endpoint, formData, {
+      if (pdfPassword.trim()) formData.append('pdfPassword', pdfPassword.trim());
+
+      const res = await axios.post('/api/statement-scan/preview', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      setPreviewData(res.data.data || []);
+      const rows = Array.isArray(res?.data?.data) ? res.data.data : [];
+      const normalized = rows.map((r) => {
+        const suggestedName = String(r?.suggestedCategoryName || '').trim();
+        const byName = suggestedName ? categoryByName[suggestedName.toLowerCase()] : null;
+        const catId = r?.suggestedCategoryId ?? byName?.id ?? null;
+        const catName = catId ? categoryById[String(catId)]?.name : suggestedName || 'Belum Terkategori';
+        return {
+          id: newTempId(),
+          date: r.date,
+          description: r.description,
+          amount: r.amount,
+          type: r.type,
+          suggestedCategoryId: catId,
+          suggestedCategoryName: catName || 'Belum Terkategori',
+        };
+      });
+
+      setPreviewData(normalized);
       setStep('preview');
     } catch (err) {
-      console.error(err);
-      // Fallback Mock Data so UI can still be reviewed if backend is offline
-      setPreviewData([
-        { id: '1', date: '2026-04-01T00:00:00Z', description: 'TRANSFER KE JAGO', amount: 500000, type: 3, suggestedCategoryId: null, suggestedCategoryName: 'Belum Terkategori' },
-        { id: '2', date: '2026-04-02T00:00:00Z', description: 'MCDONALDS', amount: 85000, type: 2, suggestedCategoryId: null, suggestedCategoryName: 'Makan' },
-        { id: '3', date: '2026-04-03T00:00:00Z', description: 'GAJI APRIL', amount: 8000000, type: 1, suggestedCategoryId: null, suggestedCategoryName: 'Gaji' },
-      ]);
-      setStep('preview');
-      alert("Backend tidak merespons. Menampilkan data Simulasi Preview.");
+      const apiMessage = err?.response?.data?.message || err?.message;
+      alert(apiMessage || 'Gagal membaca PDF. Coba lagi.');
     } finally {
       setIsProcessing(false);
     }
@@ -99,6 +161,18 @@ export default function UploadStatementModal({ isOpen, onClose }) {
     ));
   };
 
+  const handleCategoryChange = (id, categoryIdValue) => {
+    const c = categoryById[String(categoryIdValue)];
+    if (!c) return;
+    setPreviewData((prev) =>
+      prev.map((item) =>
+        item.id === id
+          ? { ...item, suggestedCategoryId: c.id, suggestedCategoryName: c.name }
+          : item
+      )
+    );
+  };
+
   const removeRow = (id) => {
     setPreviewData(prev => prev.filter(item => item.id !== id));
   };
@@ -107,17 +181,29 @@ export default function UploadStatementModal({ isOpen, onClose }) {
     setIsProcessing(true);
     
     try {
-      await axios.post('/api/transactions/confirm?accountId=1', previewData);
+      if (!accountId) {
+        throw new Error('Akun tidak valid.');
+      }
+      const payload = previewData.map((x) => ({
+        date: x.date,
+        description: x.description,
+        amount: x.amount,
+        type: x.type,
+        suggestedCategoryId: x.suggestedCategoryId ?? null,
+        suggestedCategoryName: x.suggestedCategoryName,
+      }));
+      await axios.post(`/api/transactions/confirm?accountId=${encodeURIComponent(accountId)}`, payload);
       setStep('success');
     } catch (err) {
-      console.error(err);
-      setStep('success'); // Fallback demo
+      const apiMessage = err?.response?.data?.message || err?.message;
+      alert(apiMessage || 'Gagal menyimpan transaksi.');
     } finally {
       setIsProcessing(false);
       setTimeout(() => {
         setStep('upload');
         setFile(null);
         setPreviewData([]);
+        setPdfPassword('');
         onClose();
       }, 3000);
     }
@@ -152,7 +238,7 @@ export default function UploadStatementModal({ isOpen, onClose }) {
                 ) : null}
                 <SearchableSelect
                   value={bankCode}
-                  onChange={(v) => setBankCode(String(v))}
+                  onChange={(v) => { setBankCode(String(v)); setPdfPassword(''); }}
                   options={
                     bankOptions.length === 0
                       ? [{ value: 'BCA', label: 'BCA' }]
@@ -164,14 +250,17 @@ export default function UploadStatementModal({ isOpen, onClose }) {
                   }
                   className="w-full bg-gray-50 border border-gray-200 text-gray-700 py-3 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
                 />
-                <label className="mt-3 inline-flex items-center gap-2 text-xs text-gray-600">
-                  <input
-                    type="checkbox"
-                    checked={useAi}
-                    onChange={(e) => setUseAi(e.target.checked)}
-                  />
-                  Gunakan AI (Gemini) untuk ekstraksi transaksi (BCA PDF)
-                </label>
+                {isBni ? (
+                  <div className="mt-4">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Password PDF BNI</label>
+                    <input
+                      value={pdfPassword}
+                      onChange={(e) => setPdfPassword(e.target.value)}
+                      placeholder="DDMMYYYY"
+                      className="w-full bg-gray-50 border border-gray-200 text-gray-700 py-3 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                    />
+                  </div>
+                ) : null}
               </div>
 
               <div>
@@ -237,16 +326,10 @@ export default function UploadStatementModal({ isOpen, onClose }) {
                       </td>
                       <td className="p-3">
                         <SearchableSelect
-                          value={item.suggestedCategoryName}
-                          onChange={(v) => handleFieldChange(item.id, 'suggestedCategoryName', String(v))}
-                          options={[
-                            { value: 'Gaji', label: 'Gaji / Income' },
-                            { value: 'Makan', label: 'Makan & Jajan' },
-                            { value: 'Transport', label: 'Transportasi' },
-                            { value: 'Belanja', label: 'Belanja Bulanan' },
-                            { value: 'Internal', label: 'Transfer Internal (Abaikan)' },
-                          ]}
-                          emptyLabel="-- Pilih Kategori --"
+                          value={item.suggestedCategoryId ? String(item.suggestedCategoryId) : ''}
+                          onChange={(v) => handleCategoryChange(item.id, String(v))}
+                          options={categoryOptions}
+                          emptyLabel="Belum Terkategori"
                           className="w-full bg-white border border-gray-200 text-gray-700 text-xs py-1.5 px-2 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                           menuClassName="text-sm"
                         />

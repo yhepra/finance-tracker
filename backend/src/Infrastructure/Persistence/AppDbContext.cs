@@ -19,6 +19,8 @@ public class AppDbContext : DbContext
     public DbSet<Transaction> Transactions { get; set; }
     public DbSet<MonthlySummary> MonthlySummaries { get; set; }
     public DbSet<MonthlyBudget> MonthlyBudgets { get; set; }
+    public DbSet<Budget> Budgets { get; set; }
+    public DbSet<ExpectedIncome> ExpectedIncomes { get; set; }
     public DbSet<User> Users { get; set; }
     public DbSet<AccountMonthlyBalance> AccountMonthlyBalances { get; set; }
     public DbSet<DebtReceivable> DebtReceivables { get; set; }
@@ -28,6 +30,8 @@ public class AppDbContext : DbContext
     public DbSet<UserIntegrationSecret> UserIntegrationSecrets { get; set; }
     public DbSet<UserPreference> UserPreferences { get; set; }
     public DbSet<UserDirectoryTerm> UserDirectoryTerms { get; set; }
+    public DbSet<AppLog> AppLogs { get; set; }
+    public DbSet<Notification> Notifications { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -97,6 +101,41 @@ public class AppDbContext : DbContext
             .Property(b => b.PlannedAmount)
             .HasColumnType("varchar(120)")
             .HasConversion(decimalConverter);
+
+        // ExpectedIncome: encrypt Amount
+        modelBuilder.Entity<ExpectedIncome>()
+            .HasIndex(x => new { x.UserId, x.Month, x.Year })
+            .IsUnique();
+
+        modelBuilder.Entity<ExpectedIncome>()
+            .Property(b => b.Amount)
+            .HasColumnType("varchar(120)")
+            .HasConversion(decimalConverter);
+
+        modelBuilder.Entity<Budget>()
+            .HasIndex(x => new { x.UserId, x.CategoryId, x.Period })
+            .IsUnique();
+
+        modelBuilder.Entity<Budget>()
+            .HasOne(x => x.User)
+            .WithMany()
+            .HasForeignKey(x => x.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Budget>()
+            .HasOne(x => x.Category)
+            .WithMany()
+            .HasForeignKey(x => x.CategoryId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Budget>()
+            .Property(x => x.AmountLimit)
+            .HasColumnType("varchar(120)")
+            .HasConversion(decimalConverter);
+
+        modelBuilder.Entity<Budget>()
+            .Property(x => x.Notes)
+            .HasConversion(stringConverter);
 
         // ── User PII ──────────────────────────────────────────────────────────
         modelBuilder.Entity<User>()

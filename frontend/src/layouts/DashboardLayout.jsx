@@ -7,6 +7,7 @@ import {
     PlusCircle, 
     Calendar, 
     ArrowRightLeft, 
+    PiggyBank,
     BarChart3, 
     Settings,
     ChevronsLeft, 
@@ -16,6 +17,7 @@ import {
 } from 'lucide-react';
 import { t } from '../i18n';
 import FeedbackModal from '../components/FeedbackModal';
+import NotificationBell from '../components/NotificationBell';
 
 
 const DashboardLayout = ({ children }) => {
@@ -29,6 +31,14 @@ const DashboardLayout = ({ children }) => {
     const [name, setName] = useState(localStorage.getItem('auth_name') || '');
     const [role, setRole] = useState(localStorage.getItem('auth_role') || 'User');
     const displayName = name || email || 'User';
+
+    const greeting = useMemo(() => {
+        const hour = new Date().getHours();
+        if (hour >= 5 && hour < 11) return 'Selamat pagi';
+        if (hour >= 11 && hour < 15) return 'Selamat siang';
+        if (hour >= 15 && hour < 18) return 'Selamat sore';
+        return 'Selamat malam';
+    }, [i18nTick]); // also dependency on i18n if needed, but Indonesian is clear
 
     useEffect(() => {
         const sync = () => {
@@ -70,6 +80,7 @@ const DashboardLayout = ({ children }) => {
             { name: t('nav.monthlyBalance', 'Rekening'), icon: <Wallet size={20} />, path: '/saldo', v },
             { name: t('nav.scan', 'Scan Rekening'), icon: <Camera size={20} />, path: '/scan', v },
             { name: t('nav.manual', 'Transaksi Manual'), icon: <PlusCircle size={20} />, path: '/transaksi', v },
+            { name: t('nav.budget', 'Budgeting'), icon: <PiggyBank size={20} />, path: '/budget', v },
             { name: t('nav.recurring', 'Tagihan Rutin'), icon: <Calendar size={20} />, path: '/tagihan', v },
             { name: t('nav.debts', 'Hutang & Piutang'), icon: <ArrowRightLeft size={20} />, path: '/hutang-piutang', v },
             { name: t('nav.reports', 'Laporan'), icon: <BarChart3 size={20} />, path: '/laporan', v }
@@ -119,17 +130,15 @@ const DashboardLayout = ({ children }) => {
                 <div className="h-16 flex items-center justify-between px-4 border-b border-blue-800">
                     {isSidebarOpen ? (
                       <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-white shadow-md shadow-blue-900/40">
-                          <Wallet size={16} />
-                        </div>
-                        <span className="text-xl font-black tracking-tighter text-white">
-                          Fin<span className="text-blue-300">Track</span>
-                        </span>
+                        <img src="/logo-icon.png" alt="Alokasi" className="h-8 w-8 object-contain" />
+                        <span className="text-xl font-black tracking-tight text-white">Alokasi</span>
                       </div>
-                    ) : null}
+                    ) : (
+                      <img src="/logo-icon.png" alt="Alokasi" className="h-8 w-8 object-contain mx-auto" />
+                    )}
                     <button 
                         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                        className={`p-1 rounded hover:bg-blue-800 ${!isSidebarOpen && 'mx-auto'}`}
+                        className={`p-1 rounded hover:bg-blue-800 ${!isSidebarOpen && 'hidden'}`}
                     >
                         {isSidebarOpen ? <ChevronsLeft size={24} /> : <Menu size={24} />}
                     </button>
@@ -188,56 +197,61 @@ const DashboardLayout = ({ children }) => {
             <main className="flex-1 flex flex-col h-screen overflow-hidden">
                 {/* Header */}
                 <header className="h-16 bg-white shadow-sm flex items-center justify-between px-8 z-10 shrink-0">
-                    <h2 className="text-xl font-semibold text-slate-800">{t('auth.welcome', 'Welcome')}, {displayName}</h2>
-                    <div
-                        className="relative"
-                        tabIndex={0}
-                        onBlur={() => setIsProfileMenuOpen(false)}
-                    >
-                        <button
-                            type="button"
-                            onClick={() => setIsProfileMenuOpen((v) => !v)}
-                            className="w-10 h-10 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center hover:bg-indigo-700"
-                            aria-label="Profile menu"
+                    <h2 className="text-xl font-semibold text-slate-800">{greeting}, {displayName}</h2>
+                    <div className="flex items-center gap-2">
+                        {/* Notification Bell */}
+                        <NotificationBell />
+                        {/* Profile Menu */}
+                        <div
+                            className="relative"
+                            tabIndex={0}
+                            onBlur={() => setIsProfileMenuOpen(false)}
                         >
-                            {initials || <User size={18} />}
-                        </button>
+                            <button
+                                type="button"
+                                onClick={() => setIsProfileMenuOpen((v) => !v)}
+                                className="w-10 h-10 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center hover:bg-indigo-700"
+                                aria-label="Profile menu"
+                            >
+                                {initials || <User size={18} />}
+                            </button>
 
-                        {isProfileMenuOpen ? (
-                            <div className="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden">
-                                <div className="px-4 py-3 border-b border-slate-100">
-                                    <div className="text-sm font-semibold text-slate-800 truncate">{displayName}</div>
-                                    <div className="text-xs text-slate-500 truncate">{email}</div>
+                            {isProfileMenuOpen ? (
+                                <div className="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden">
+                                    <div className="px-4 py-3 border-b border-slate-100">
+                                        <div className="text-sm font-semibold text-slate-800 truncate">{displayName}</div>
+                                        <div className="text-xs text-slate-500 truncate">{email}</div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        onClick={() => {
+                                            setIsProfileMenuOpen(false);
+                                            setIsFeedbackOpen(true);
+                                        }}
+                                        className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
+                                    >
+                                        {t('nav.feedback', 'Feedback')}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        onClick={() => navigate('/settings/account')}
+                                        className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
+                                    >
+                                        {t('settings.account', 'Account')}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        onClick={logout}
+                                        className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50"
+                                    >
+                                        {t('common.logout', 'Logout')}
+                                    </button>
                                 </div>
-                                <button
-                                    type="button"
-                                    onMouseDown={(e) => e.preventDefault()}
-                                    onClick={() => {
-                                        setIsProfileMenuOpen(false);
-                                        setIsFeedbackOpen(true);
-                                    }}
-                                    className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
-                                >
-                                    {t('nav.feedback', 'Feedback')}
-                                </button>
-                                <button
-                                    type="button"
-                                    onMouseDown={(e) => e.preventDefault()}
-                                    onClick={() => navigate('/settings/account')}
-                                    className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
-                                >
-                                    {t('settings.account', 'Account')}
-                                </button>
-                                <button
-                                    type="button"
-                                    onMouseDown={(e) => e.preventDefault()}
-                                    onClick={logout}
-                                    className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50"
-                                >
-                                    {t('common.logout', 'Logout')}
-                                </button>
-                            </div>
-                        ) : null}
+                            ) : null}
+                        </div>
                     </div>
                 </header>
 

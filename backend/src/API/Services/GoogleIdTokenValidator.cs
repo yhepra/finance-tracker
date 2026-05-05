@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
+using System.Linq;
 using System.Security.Claims;
 using System.Text.Json;
 
@@ -28,8 +29,14 @@ public sealed class GoogleIdTokenValidator
         if (string.IsNullOrWhiteSpace(token))
             return (false, "Token Google tidak boleh kosong.", null);
 
-        var clientId = (_config["OAuth:Google:ClientId"] ?? string.Empty).Trim();
-        if (string.IsNullOrWhiteSpace(clientId))
+        var clientIds = new[]
+        {
+            (_config["OAuth:Google:ClientId"] ?? string.Empty).Trim(),
+            (_config["OAuth:Google:ClientIdDev"] ?? string.Empty).Trim(),
+            (_config["OAuth:Google:ClientIdProd"] ?? string.Empty).Trim()
+        }.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.Ordinal).ToArray();
+
+        if (clientIds.Length == 0)
             return (false, "Google OAuth ClientId belum dikonfigurasi pada server (OAuth:Google:ClientId).", null);
 
         JsonWebKeySet jwks;
@@ -49,7 +56,7 @@ public sealed class GoogleIdTokenValidator
             ValidateIssuer = true,
             ValidIssuers = ValidIssuers,
             ValidateAudience = true,
-            ValidAudience = clientId,
+            ValidAudiences = clientIds,
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromMinutes(2)
         };
@@ -60,15 +67,16 @@ public sealed class GoogleIdTokenValidator
             var handler = new JwtSecurityTokenHandler();
             principal = handler.ValidateToken(token, validationParams, out _);
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine($"[GoogleIdTokenValidator] Exception: {ex.Message}");
             return (false, "Token Google tidak valid.", null);
         }
 
-        var email = principal.FindFirstValue("email") ?? string.Empty;
-        var name = principal.FindFirstValue("name") ?? principal.FindFirstValue("given_name") ?? string.Empty;
+        var email = principal.FindFirstValue("email") ?? principal.FindFirstValue(ClaimTypes.Email) ?? string.Empty;
+        var name = principal.FindFirstValue("name") ?? principal.FindFirstValue(ClaimTypes.Name) ?? principal.FindFirstValue("given_name") ?? string.Empty;
         var emailVerified = principal.FindFirstValue("email_verified") ?? string.Empty;
-        var sub = principal.FindFirstValue("sub") ?? string.Empty;
+        var sub = principal.FindFirstValue("sub") ?? principal.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
 
         if (string.IsNullOrWhiteSpace(email))
             return (false, "Email tidak ditemukan pada token Google.", null);

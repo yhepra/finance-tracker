@@ -153,8 +153,8 @@ export default function ScanRekening() {
       setErrorMessage(`Belum ada rekening/akun yang terhubung ke bank ${normalizedBank}. Silakan buat rekening baru atau edit rekening yang sudah ada di menu Rekening, lalu pastikan kolom bank sudah dipilih dengan benar.`);
       return;
     }
-    if (!['BCA', 'BNI', 'SUPERBANK'].includes(normalizedBank)) {
-      setErrorMessage('Bank belum didukung. Pilih BCA, BNI, atau Superbank.');
+    if (!['BCA', 'BNI', 'SUPERBANK', 'JAGO'].includes(normalizedBank)) {
+      setErrorMessage('Bank belum didukung. Pilih BCA, BNI, Superbank, atau Bank Jago.');
       return;
     }
     if (isBni && !pdfPassword.trim()) {
@@ -304,7 +304,7 @@ export default function ScanRekening() {
               </span>
             </div>
             <p className="text-sm text-slate-500 mt-1">
-              Upload rekening koran PDF (BCA / BNI / Superbank) dan cek draf transaksi sebelum disimpan. Fitur ini masih dalam tahap pengembangan.
+              Upload rekening koran PDF (BCA / BNI / Superbank / Bank Jago) dan cek draf transaksi sebelum disimpan. Fitur ini masih dalam tahap pengembangan.
             </p>
           </div>
 
@@ -338,7 +338,7 @@ export default function ScanRekening() {
                     }
                     className="w-full bg-gray-50 border border-gray-200 text-gray-700 py-3 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
                   />
-                  <p className="mt-1.5 text-xs text-slate-500">Mendukung BCA, BNI, dan Superbank. Mandiri segera hadir.</p>
+                  <p className="mt-1.5 text-xs text-slate-500">Mendukung BCA, BNI, Superbank, dan Bank Jago. Bank lainnya segera hadir.</p>
                 </div>
 
                 {/* Password field — only for BNI */}

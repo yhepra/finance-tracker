@@ -6,6 +6,7 @@ import HutangPiutang from './pages/HutangPiutang'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import ManualTransaction from './pages/ManualTransaction'
+import Budgeting from './pages/Budgeting'
 import Laporan from './pages/Laporan'
 import SaldoAwal from './pages/SaldoAwal'
 import Settings from './pages/Settings'
@@ -114,6 +115,14 @@ function App() {
           element={
             <RequireAuth>
               <ManualTransaction />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/budget"
+          element={
+            <RequireAuth>
+              <Budgeting />
             </RequireAuth>
           }
         />

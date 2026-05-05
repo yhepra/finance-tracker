@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import axios from 'axios'
-import { Eye, EyeOff, Lock, Mail, Wallet, ArrowRight, ShieldCheck, Cpu } from 'lucide-react'
+import { Eye, EyeOff, Lock, Mail, ArrowRight, ShieldCheck, Cpu } from 'lucide-react'
 import GoogleSignInButton from '../components/GoogleSignInButton'
 import LegalPopup from '../components/LegalPopup'
 
@@ -130,12 +130,8 @@ export default function Register() {
 
         {/* Logo Section */}
         <div className="flex items-center gap-3 relative z-10 animate-in fade-in slide-in-from-top-4 duration-700">
-          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-2xl shadow-blue-500/40 ring-1 ring-white/20">
-            <Wallet size={24} />
-          </div>
-          <span className="text-3xl font-black tracking-tighter text-white">
-            Fin<span className="text-blue-400">Track</span>
-          </span>
+          <img src="/logo-icon.png" alt="Alokasi" className="h-12 w-12 object-contain" />
+          <span className="text-3xl font-black tracking-tight text-white">Alokasi</span>
         </div>
 
         {/* Main Content Area */}
@@ -176,7 +172,7 @@ export default function Register() {
 
         {/* Footer info */}
         <div className="relative z-10 flex items-center justify-between text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-12 animate-in fade-in duration-1000 delay-700">
-          <span>&copy; {new Date().getFullYear()} FinTrack Personal</span>
+          <span>&copy; {new Date().getFullYear()} Alokasi</span>
           <div className="flex gap-4">
             <span className="hover:text-slate-300 cursor-pointer">Security</span>
             <span className="hover:text-slate-300 cursor-pointer">Privacy</span>
@@ -196,12 +192,8 @@ export default function Register() {
         <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-8 duration-700">
           {/* Mobile Logo */}
           <div className="flex items-center justify-center gap-2 mb-10 lg:hidden">
-            <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-blue-200">
-              <Wallet size={24} />
-            </div>
-            <span className="text-2xl font-black tracking-tighter text-slate-900">
-              Fin<span className="text-blue-600">Track</span>
-            </span>
+            <img src="/logo-icon.png" alt="Alokasi" className="h-10 w-10 object-contain" />
+            <span className="text-2xl font-black tracking-tight text-slate-900">Alokasi</span>
           </div>
 
           <div className="mb-10 text-center lg:text-left">

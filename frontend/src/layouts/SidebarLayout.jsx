@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { LayoutDashboard, FileText, Settings, LogOut, Wallet } from 'lucide-react';
+import { LayoutDashboard, FileText, Settings, LogOut } from 'lucide-react';
 
 export default function SidebarLayout() {
   const menuItems = [
@@ -13,9 +13,9 @@ export default function SidebarLayout() {
     <div className="flex h-screen bg-gray-50 overflow-hidden font-sans">
       {/* Sidebar */}
       <aside className="w-64 bg-blue-900 shadow-xl flex flex-col text-white">
-        <div className="h-20 flex items-center px-6 border-b border-blue-800">
-          <Wallet className="text-blue-300 mr-3" size={28} />
-          <span className="text-2xl font-bold tracking-tight">FinTrack</span>
+        <div className="h-20 flex items-center px-6 border-b border-blue-800 gap-3">
+          <img src="/logo-icon.png" alt="Alokasi" className="h-8 w-8 object-contain" />
+          <span className="text-2xl font-bold tracking-tight">Alokasi</span>
         </div>
         
         <nav className="flex-1 px-4 py-6 space-y-2">

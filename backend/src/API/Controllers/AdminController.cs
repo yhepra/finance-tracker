@@ -63,6 +63,31 @@ public class AdminController : ControllerBase
         return Ok(new { data = rows });
     }
 
+    [HttpGet("logs")]
+    public async Task<IActionResult> GetLogs()
+    {
+        var logs = await (
+            from l in _db.AppLogs.AsNoTracking()
+            join u in _db.Users.AsNoTracking() on l.UserId equals u.Id into ug
+            from u in ug.DefaultIfEmpty()
+            orderby l.CreatedAtUtc descending
+            select new
+            {
+                l.Id,
+                UserEmail = l.UserId != null ? (u != null ? MaskEmail(u.Email) : "Unknown") : "System",
+                UserFullName = l.UserId != null ? (u != null ? u.FullName : "N/A") : "System",
+                l.Level,
+                l.Category,
+                l.Message,
+                l.Detail,
+                l.IpAddress,
+                l.CreatedAtUtc
+            }
+        ).Take(100).ToListAsync();
+
+        return Ok(new { data = logs });
+    }
+
     private static string MaskEmail(string email)
     {
         if (string.IsNullOrWhiteSpace(email)) return string.Empty;
