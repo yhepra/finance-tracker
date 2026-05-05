@@ -1,9 +1,2 @@
 {
-  "Host": "smtp-relay.brevo.com",
-  "Port": 587,
-  "Username": "your-email@example.com",
-  "Password": "YOUR_BREVO_API_KEY_HERE",
-  "SenderEmail": "sender@example.com",
-  "SenderName": "FinTrack",
-  "AdminEmail": "admin@example.com"
 }

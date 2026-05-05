@@ -32,7 +32,7 @@ services:
         condition: service_healthy
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__DefaultConnection: "Server=db;Database=${MYSQL_DATABASE:-FinanceTrackerDb};Uid=root;Pwd=${MYSQL_ROOT_PASSWORD:-financetracker};"
+      ConnectionStrings__DefaultConnection: "Server=db;Database=${MYSQL_DATABASE:-FinanceTrackerDb};Uid=root;Pwd=${MYSQL_ROOT_PASSWORD:-financetracker};AllowPublicKeyRetrieval=True;SslMode=None;"
       Jwt__Key: ${JWT_KEY:-super-secret-jwt-key-change-this-in-production-min-32-chars!}
       Jwt__Issuer: ${JWT_ISSUER:-FinanceTracker}
       Jwt__Audience: ${JWT_AUDIENCE:-FinanceTracker}
