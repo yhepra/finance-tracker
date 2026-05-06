@@ -256,16 +256,18 @@ CREATE TABLE IF NOT EXISTS `AppLogs` (
             {
                 var json = await System.IO.File.ReadAllTextAsync(path);
                 var smtpJson = System.Text.Json.JsonSerializer.Deserialize<FinanceTracker.API.Controllers.SmtpSettingsModel>(json);
-                if (smtpJson != null && !string.IsNullOrEmpty(smtpJson.Host))
+                if (smtpJson != null &&
+                    !string.IsNullOrWhiteSpace(smtpJson.Host) &&
+                    !string.IsNullOrWhiteSpace(smtpJson.Username))
                 {
                     db.SmtpSettings.Add(new SmtpSetting
                     {
-                        Host = smtpJson.Host,
+                        Host = smtpJson.Host.Trim(),
                         Port = smtpJson.Port > 0 ? smtpJson.Port : 587,
-                        Username = smtpJson.Username ?? string.Empty,
+                        Username = smtpJson.Username.Trim(),
                         Password = smtpJson.Password ?? string.Empty,
-                        SenderEmail = smtpJson.SenderEmail ?? string.Empty,
-                        SenderName = smtpJson.SenderName ?? "Finance Tracker",
+                        SenderEmail = (smtpJson.SenderEmail ?? string.Empty).Trim(),
+                        SenderName = string.IsNullOrWhiteSpace(smtpJson.SenderName) ? "Finance Tracker" : smtpJson.SenderName.Trim(),
                         EnableSsl = true,
                         UpdatedAtUtc = DateTime.UtcNow
                     });

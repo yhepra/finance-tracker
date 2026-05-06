@@ -142,11 +142,43 @@ public class SettingsController : ControllerBase
     }
 
     [HttpPut("smtp")]
-    public IActionResult UpsertSmtp([FromBody] SmtpSettingsModel request)
+    public async Task<IActionResult> UpsertSmtp([FromBody] SmtpSettingsModel request)
     {
         var path = Path.Combine(Directory.GetCurrentDirectory(), "SmtpSettings.json");
         var json = System.Text.Json.JsonSerializer.Serialize(request);
         System.IO.File.WriteAllText(path, json);
+
+        var setting = await _db.SmtpSettings.OrderBy(s => s.Id).FirstOrDefaultAsync();
+        if (setting == null)
+        {
+            setting = new SmtpSetting
+            {
+                Host = (request.Host ?? string.Empty).Trim(),
+                Port = request.Port > 0 ? request.Port : 587,
+                Username = (request.Username ?? string.Empty).Trim(),
+                Password = request.Password ?? string.Empty,
+                SenderEmail = (request.SenderEmail ?? string.Empty).Trim(),
+                SenderName = string.IsNullOrWhiteSpace(request.SenderName) ? "Finance Tracker" : request.SenderName.Trim(),
+                EnableSsl = true,
+                UpdatedAtUtc = DateTime.UtcNow
+            };
+            _db.SmtpSettings.Add(setting);
+        }
+        else
+        {
+            setting.Host = (request.Host ?? string.Empty).Trim();
+            setting.Port = request.Port > 0 ? request.Port : 587;
+            setting.Username = (request.Username ?? string.Empty).Trim();
+            if (!string.IsNullOrEmpty(request.Password))
+                setting.Password = request.Password;
+            setting.SenderEmail = (request.SenderEmail ?? string.Empty).Trim();
+            setting.SenderName = string.IsNullOrWhiteSpace(request.SenderName) ? "Finance Tracker" : request.SenderName.Trim();
+            setting.EnableSsl = true;
+            setting.UpdatedAtUtc = DateTime.UtcNow;
+        }
+
+        await _db.SaveChangesAsync();
+
         return Ok(request);
     }
 

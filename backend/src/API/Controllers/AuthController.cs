@@ -1,5 +1,6 @@
 using FinanceTracker.Domain.Entities;
 using FinanceTracker.API.Services;
+using FinanceTracker.Application.Interfaces;
 using FinanceTracker.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -20,13 +21,15 @@ public class AuthController : ControllerBase
     private readonly IConfiguration _configuration;
     private readonly IHostEnvironment _environment;
     private readonly GoogleIdTokenValidator _google;
+    private readonly ILogService _log;
 
-    public AuthController(AppDbContext db, IConfiguration configuration, IHostEnvironment environment, GoogleIdTokenValidator google)
+    public AuthController(AppDbContext db, IConfiguration configuration, IHostEnvironment environment, GoogleIdTokenValidator google, ILogService log)
     {
         _db = db;
         _configuration = configuration;
         _environment = environment;
         _google = google;
+        _log = log;
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -78,7 +81,10 @@ public class AuthController : ControllerBase
         {
             await SendEmailAsync(email, verificationToken, EmailType.Verification);
         }
-        catch { /* Suppress email errors in dev */ }
+        catch (Exception ex)
+        {
+            await _log.LogWarningAsync("Email", "Gagal mengirim email verifikasi saat registrasi", ex.Message, null);
+        }
 
         return Ok(new
         {
@@ -436,7 +442,10 @@ public class AuthController : ControllerBase
         {
             await SendEmailAsync(user.Email, tokenString, EmailType.ResetPassword);
         }
-        catch { /* Suppress */ }
+        catch (Exception ex)
+        {
+            await _log.LogWarningAsync("Email", "Gagal mengirim email reset password", ex.Message, user.Id);
+        }
 
         return Ok(new { message = "Jika email terdaftar, link reset password telah dikirim." });
     }
@@ -547,40 +556,21 @@ public class AuthController : ControllerBase
     {
         var frontendUrl = _configuration["App:FrontendUrl"] ?? "http://localhost:5174";
 
-        // Ambil SMTP dari database
-        var smtpDb = await _db.SmtpSettings.OrderBy(s => s.Id).FirstOrDefaultAsync();
-
-        string host, username, password, senderEmail, senderName;
-        int port;
-        bool enableSsl;
-
-        if (smtpDb != null && !string.IsNullOrEmpty(smtpDb.Host))
+        var smtpConfig = await ResolveSmtpAsync();
+        if (smtpConfig == null)
         {
-            host = smtpDb.Host;
-            port = smtpDb.Port;
-            username = smtpDb.Username;
-            password = smtpDb.Password;
-            senderEmail = smtpDb.SenderEmail;
-            senderName = smtpDb.SenderName;
-            enableSsl = smtpDb.EnableSsl;
+            await _log.LogWarningAsync("Email", "SMTP belum dikonfigurasi, email tidak dikirim", $"To={toEmail}", null);
+            return;
         }
-        else
+
+        var (host, port, username, password, senderEmailRaw, senderNameRaw, enableSsl) = smtpConfig.Value;
+        var senderEmail = string.IsNullOrWhiteSpace(senderEmailRaw) ? username : senderEmailRaw;
+        var senderName = string.IsNullOrWhiteSpace(senderNameRaw) ? "Finance Tracker" : senderNameRaw;
+
+        if (string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(username))
         {
-            // Fallback ke SmtpSettings.json (untuk backward compatibility)
-            var path = Path.Combine(Directory.GetCurrentDirectory(), "SmtpSettings.json");
-            if (!System.IO.File.Exists(path)) return;
-
-            var json = await System.IO.File.ReadAllTextAsync(path);
-            var smtp = System.Text.Json.JsonSerializer.Deserialize<SmtpSettingsModel>(json);
-            if (smtp == null || string.IsNullOrEmpty(smtp.Host)) return;
-
-            host = smtp.Host;
-            port = smtp.Port;
-            username = smtp.Username;
-            password = smtp.Password;
-            senderEmail = smtp.SenderEmail;
-            senderName = smtp.SenderName;
-            enableSsl = true;
+            await _log.LogWarningAsync("Email", "Konfigurasi SMTP tidak lengkap, email tidak dikirim", $"Host='{host}', Username='{username}'", null);
+            return;
         }
 
         string subject, body;
@@ -599,21 +589,80 @@ public class AuthController : ControllerBase
                    $"Link ini berlaku selama 2 jam.";
         }
 
-        using var client = new System.Net.Mail.SmtpClient(host, port)
+        try
         {
-            Credentials = new System.Net.NetworkCredential(username, password),
-            EnableSsl = enableSsl
-        };
+            using var client = new System.Net.Mail.SmtpClient(host, port)
+            {
+                Credentials = new System.Net.NetworkCredential(username, password),
+                EnableSsl = enableSsl,
+                Timeout = 15000
+            };
 
-        var mailMessage = new System.Net.Mail.MailMessage
+            var mailMessage = new System.Net.Mail.MailMessage
+            {
+                From = new System.Net.Mail.MailAddress(senderEmail, senderName),
+                Subject = subject,
+                Body = body,
+                IsBodyHtml = false
+            };
+            mailMessage.To.Add(toEmail);
+            await client.SendMailAsync(mailMessage);
+
+            await _log.LogInfoAsync("Email", "Email berhasil dikirim", $"Type={type}, To={toEmail}, Host={host}, Port={port}, EnableSsl={enableSsl}", null);
+        }
+        catch (Exception ex)
         {
-            From = new System.Net.Mail.MailAddress(senderEmail, senderName),
-            Subject = subject,
-            Body = body,
-            IsBodyHtml = false
-        };
-        mailMessage.To.Add(toEmail);
-        await client.SendMailAsync(mailMessage);
+            await _log.LogErrorAsync("Email", "Gagal mengirim email", $"Type={type}, To={toEmail}, Host={host}, Port={port}, EnableSsl={enableSsl}, Error={ex.Message}", null, ex.ToString());
+            throw;
+        }
+    }
+
+    private async Task<(string Host, int Port, string Username, string Password, string SenderEmail, string SenderName, bool EnableSsl)?> ResolveSmtpAsync()
+    {
+        // 1. Coba ambil dari Database dulu (Prioritas Utama)
+        var smtpDb = await _db.SmtpSettings.OrderBy(s => s.Id).FirstOrDefaultAsync();
+        if (smtpDb != null &&
+            !string.IsNullOrWhiteSpace(smtpDb.Host) &&
+            !string.IsNullOrWhiteSpace(smtpDb.Username))
+        {
+            return (
+                smtpDb.Host.Trim(),
+                smtpDb.Port > 0 ? smtpDb.Port : 587,
+                (smtpDb.Username ?? string.Empty).Trim(),
+                smtpDb.Password ?? string.Empty,
+                (smtpDb.SenderEmail ?? string.Empty).Trim(),
+                (smtpDb.SenderName ?? string.Empty).Trim(),
+                smtpDb.EnableSsl
+            );
+        }
+
+        // 2. Fallback ke file SmtpSettings.json jika di DB belum ada
+        var path = Path.Combine(Directory.GetCurrentDirectory(), "SmtpSettings.json");
+        if (System.IO.File.Exists(path))
+        {
+            try
+            {
+                var json = await System.IO.File.ReadAllTextAsync(path);
+                var smtp = System.Text.Json.JsonSerializer.Deserialize<SmtpSettingsModel>(json);
+                if (smtp != null && !string.IsNullOrWhiteSpace(smtp.Host) && !string.IsNullOrWhiteSpace(smtp.Username))
+                {
+                    return (
+                        smtp.Host.Trim(),
+                        smtp.Port > 0 ? smtp.Port : 587,
+                        smtp.Username.Trim(),
+                        smtp.Password ?? string.Empty,
+                        (smtp.SenderEmail ?? string.Empty).Trim(),
+                        (smtp.SenderName ?? string.Empty).Trim(),
+                        true
+                    );
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        return null;
     }
 
     // ─────────────────────────────────────────────────────────────────
