@@ -36,7 +36,7 @@ public static class FeedbackBugEmailNotifier
             };
 
             var fromEmail = !string.IsNullOrWhiteSpace(smtp.SenderEmail) ? smtp.SenderEmail : smtp.Username;
-            var fromName = !string.IsNullOrWhiteSpace(smtp.SenderName) ? smtp.SenderName : "Finance Tracker";
+            var fromName = !string.IsNullOrWhiteSpace(smtp.SenderName) ? smtp.SenderName : "Alokasi";
 
             var body = new StringBuilder();
             body.AppendLine("Ada feedback kategori BUG masuk.");

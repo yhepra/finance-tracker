@@ -135,7 +135,7 @@ public class AdminController : ControllerBase
                 Username = request.Username.Trim(),
                 Password = request.Password ?? string.Empty,
                 SenderEmail = request.SenderEmail.Trim(),
-                SenderName = (request.SenderName ?? "Finance Tracker").Trim(),
+                SenderName = (request.SenderName ?? "Alokasi").Trim(),
                 EnableSsl = request.EnableSsl,
                 UpdatedAtUtc = DateTime.UtcNow
             };
@@ -149,7 +149,7 @@ public class AdminController : ControllerBase
             if (!string.IsNullOrEmpty(request.Password))
                 setting.Password = request.Password;
             setting.SenderEmail = request.SenderEmail.Trim();
-            setting.SenderName = (request.SenderName ?? "Finance Tracker").Trim();
+            setting.SenderName = (request.SenderName ?? "Alokasi").Trim();
             setting.EnableSsl = request.EnableSsl;
             setting.UpdatedAtUtc = DateTime.UtcNow;
         }
@@ -178,8 +178,8 @@ public class AdminController : ControllerBase
             var msg = new System.Net.Mail.MailMessage
             {
                 From = new System.Net.Mail.MailAddress(setting.SenderEmail, setting.SenderName),
-                Subject = "Test Email - Finance Tracker",
-                Body = "Ini adalah email percobaan dari Finance Tracker. Konfigurasi SMTP berhasil!",
+                Subject = "Test Email - Alokasi",
+                Body = "Ini adalah email percobaan dari Alokasi. Konfigurasi SMTP berhasil!",
                 IsBodyHtml = false
             };
             msg.To.Add(testEmail);

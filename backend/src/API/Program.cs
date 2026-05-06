@@ -267,7 +267,7 @@ CREATE TABLE IF NOT EXISTS `AppLogs` (
                         Username = smtpJson.Username.Trim(),
                         Password = smtpJson.Password ?? string.Empty,
                         SenderEmail = (smtpJson.SenderEmail ?? string.Empty).Trim(),
-                        SenderName = string.IsNullOrWhiteSpace(smtpJson.SenderName) ? "Finance Tracker" : smtpJson.SenderName.Trim(),
+                        SenderName = string.IsNullOrWhiteSpace(smtpJson.SenderName) ? "Alokasi" : smtpJson.SenderName.Trim(),
                         EnableSsl = true,
                         UpdatedAtUtc = DateTime.UtcNow
                     });

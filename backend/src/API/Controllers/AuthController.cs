@@ -565,7 +565,7 @@ public class AuthController : ControllerBase
 
         var (host, port, username, password, senderEmailRaw, senderNameRaw, enableSsl) = smtpConfig.Value;
         var senderEmail = string.IsNullOrWhiteSpace(senderEmailRaw) ? username : senderEmailRaw;
-        var senderName = string.IsNullOrWhiteSpace(senderNameRaw) ? "Finance Tracker" : senderNameRaw;
+        var senderName = string.IsNullOrWhiteSpace(senderNameRaw) ? "Alokasi" : senderNameRaw;
 
         if (string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(username))
         {
@@ -576,14 +576,14 @@ public class AuthController : ControllerBase
         string subject, body;
         if (type == EmailType.Verification)
         {
-            subject = "Verifikasi Email Finance Tracker";
+            subject = "Verifikasi Email Alokasi";
             body = $"Halo, silakan klik link berikut untuk memverifikasi akun Anda:\n\n" +
                    $"{frontendUrl.TrimEnd('/')}/verify-email?token={token}\n\n" +
                    $"Link ini berlaku selama 24 jam.";
         }
         else
         {
-            subject = "Reset Password Finance Tracker";
+            subject = "Reset Password Alokasi";
             body = $"Klik link berikut untuk reset password:\n\n" +
                    $"{frontendUrl.TrimEnd('/')}/reset-password?token={token}\n\n" +
                    $"Link ini berlaku selama 2 jam.";

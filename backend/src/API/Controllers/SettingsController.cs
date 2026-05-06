@@ -158,7 +158,7 @@ public class SettingsController : ControllerBase
                 Username = (request.Username ?? string.Empty).Trim(),
                 Password = request.Password ?? string.Empty,
                 SenderEmail = (request.SenderEmail ?? string.Empty).Trim(),
-                SenderName = string.IsNullOrWhiteSpace(request.SenderName) ? "Finance Tracker" : request.SenderName.Trim(),
+                SenderName = string.IsNullOrWhiteSpace(request.SenderName) ? "Alokasi" : request.SenderName.Trim(),
                 EnableSsl = true,
                 UpdatedAtUtc = DateTime.UtcNow
             };
@@ -172,7 +172,7 @@ public class SettingsController : ControllerBase
             if (!string.IsNullOrEmpty(request.Password))
                 setting.Password = request.Password;
             setting.SenderEmail = (request.SenderEmail ?? string.Empty).Trim();
-            setting.SenderName = string.IsNullOrWhiteSpace(request.SenderName) ? "Finance Tracker" : request.SenderName.Trim();
+            setting.SenderName = string.IsNullOrWhiteSpace(request.SenderName) ? "Alokasi" : request.SenderName.Trim();
             setting.EnableSsl = true;
             setting.UpdatedAtUtc = DateTime.UtcNow;
         }
@@ -207,9 +207,9 @@ public class SettingsController : ControllerBase
             };
             var mailMessage = new System.Net.Mail.MailMessage
             {
-                From = new System.Net.Mail.MailAddress(!string.IsNullOrWhiteSpace(smtp.SenderEmail) ? smtp.SenderEmail : smtp.Username, !string.IsNullOrWhiteSpace(smtp.SenderName) ? smtp.SenderName : "Finance Tracker"),
-                Subject = "Test Koneksi SMTP - Finance Tracker",
-                Body = "Halo!\n\nKoneksi SMTP Anda di Finance Tracker berhasil dikonfigurasi dengan benar.\n\nTerima kasih.",
+                From = new System.Net.Mail.MailAddress(!string.IsNullOrWhiteSpace(smtp.SenderEmail) ? smtp.SenderEmail : smtp.Username, !string.IsNullOrWhiteSpace(smtp.SenderName) ? smtp.SenderName : "Alokasi"),
+                Subject = "Test Koneksi SMTP - Alokasi",
+                Body = "Halo!\n\nKoneksi SMTP Anda di Alokasi berhasil dikonfigurasi dengan benar.\n\nTerima kasih.",
                 IsBodyHtml = false
             };
             mailMessage.To.Add(email);

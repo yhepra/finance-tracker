@@ -12,7 +12,7 @@ public class SmtpSetting
     public string Username { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
     public string SenderEmail { get; set; } = string.Empty;
-    public string SenderName { get; set; } = "Finance Tracker";
+    public string SenderName { get; set; } = "Alokasi";
     public bool EnableSsl { get; set; } = true;
     public DateTime UpdatedAtUtc { get; set; }
 }
