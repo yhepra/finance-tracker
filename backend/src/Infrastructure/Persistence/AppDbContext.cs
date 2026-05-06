@@ -276,6 +276,37 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Feedback>()
             .HasIndex(x => x.CreatedAtUtc);
 
+        // AppLog
+        modelBuilder.Entity<AppLog>()
+            .HasIndex(x => x.CreatedAtUtc);
+
+        // Notification
+        modelBuilder.Entity<Notification>()
+            .HasIndex(x => new { x.UserId, x.IsRead });
+
+        modelBuilder.Entity<Notification>()
+            .HasIndex(x => x.CreatedAtUtc);
+
+        modelBuilder.Entity<Notification>()
+            .Property(x => x.Type)
+            .HasMaxLength(50);
+
+        modelBuilder.Entity<Notification>()
+            .Property(x => x.Severity)
+            .HasMaxLength(20);
+
+        modelBuilder.Entity<Notification>()
+            .Property(x => x.Title)
+            .HasMaxLength(200);
+
+        modelBuilder.Entity<Notification>()
+            .Property(x => x.Message)
+            .HasMaxLength(500);
+
+        modelBuilder.Entity<Notification>()
+            .Property(x => x.ActionUrl)
+            .HasMaxLength(200);
+
         // PendingRegistration: index on token and email for fast lookups
         modelBuilder.Entity<PendingRegistration>()
             .HasIndex(x => x.VerificationToken)

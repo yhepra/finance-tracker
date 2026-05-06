@@ -10,6 +10,8 @@ namespace FinanceTracker.Infrastructure.Migrations
     {
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.Sql("DROP TABLE IF EXISTS `AppLogs`;");
+
             migrationBuilder.CreateTable(
                 name: "AppLogs",
                 columns: table => new
