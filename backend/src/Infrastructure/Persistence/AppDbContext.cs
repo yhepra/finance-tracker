@@ -40,7 +40,10 @@ public class AppDbContext : DbContext
         base.OnModelCreating(modelBuilder);
 
         // ── Encryption converters ─────────────────────────────────────────────
-        var dataKey = _configuration?["Secrets:DataKey"] ?? "default-local-dev-data-encryption-key-for-finance-tracker";
+        var dataKey =
+            _configuration?["Secrets:DataKey"]
+            ?? _configuration?["Secrets:Key"]
+            ?? "default-local-dev-data-encryption-key-for-finance-tracker";
         var stringConverter = new EncryptedStringConverter(dataKey);
         var dateOnlyConverter = new EncryptedDateOnlyConverter(dataKey);
         var decimalConverter = new EncryptedDecimalConverter(dataKey);

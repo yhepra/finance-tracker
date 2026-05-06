@@ -129,7 +129,7 @@ const DashboardLayout = ({ children }) => {
             {
                 id: 'settings',
                 title: 'Pengaturan',
-                body: 'Kelola rekening, kategori, bank, integrasi, dan SMTP.',
+                body: 'Kelola rekening, kategori, bank, dan integrasi.',
                 selector: '[data-tour="nav-settings"]',
                 openSidebar: true
             },
@@ -142,18 +142,8 @@ const DashboardLayout = ({ children }) => {
             }
         ];
 
-        if (role === 'Admin') {
-            steps.splice(5, 0, {
-                id: 'admin',
-                title: 'Admin Panel',
-                body: 'Kelola data master dan pantau log aktivitas.',
-                selector: '[data-tour="nav-admin"]',
-                openSidebar: true
-            });
-        }
-
         return steps;
-    }, [role]);
+    }, []);
 
     const closeTour = () => {
         localStorage.setItem(tourKey, '1');
