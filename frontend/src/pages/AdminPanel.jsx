@@ -128,23 +128,23 @@ export default function AdminPanel() {
 
     return (
         <DashboardLayout>
-            <div className="max-w-6xl mx-auto py-8">
-                <div className="flex items-center gap-4 mb-10">
-                    <div className="w-12 h-12 bg-amber-500 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-amber-200">
+            <div className="max-w-6xl mx-auto py-4 sm:py-8">
+                <div className="flex items-center gap-3 sm:gap-4 mb-6 sm:mb-10">
+                    <div className="w-11 h-11 sm:w-12 sm:h-12 bg-amber-500 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-amber-200">
                         <ShieldHalf size={24} />
                     </div>
                     <div>
-                        <h1 className="text-3xl font-black text-slate-900 tracking-tight">Admin Control Panel</h1>
+                        <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Admin Control Panel</h1>
                         <p className="text-slate-500 font-medium">Pusat kendali data master dan konfigurasi sistem Alokasi.</p>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-8 mb-10 sm:mb-12">
                     {masterDataCards.map((card, i) => (
                         <div 
                             key={i}
                             onClick={() => card.path ? navigate(card.path) : card.action()}
-                            className="group bg-white p-8 rounded-[2rem] border border-slate-200 hover:border-blue-400 hover:shadow-2xl hover:shadow-blue-50 transition-all cursor-pointer relative overflow-hidden"
+                            className="group bg-white p-5 sm:p-8 rounded-[2rem] border border-slate-200 hover:border-blue-400 hover:shadow-2xl hover:shadow-blue-50 transition-all cursor-pointer relative overflow-hidden"
                         >
                             <div className={`w-16 h-16 ${card.color} rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform`}>
                                 {card.icon}
@@ -167,7 +167,7 @@ export default function AdminPanel() {
                     <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={() => setActiveView(null)}></div>
                     <div className="relative bg-white w-full max-w-5xl max-h-[90vh] rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
                         {/* Modal Header */}
-                        <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                        <div className="px-4 sm:px-8 py-5 sm:py-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                             <div className="flex items-center gap-4">
                                 <div className={`p-3 rounded-2xl ${
                                     activeView === 'users' ? 'bg-amber-100/50 text-amber-600' : 
@@ -202,7 +202,7 @@ export default function AdminPanel() {
                         </div>
 
                         {/* Modal Body */}
-                        <div className="flex-1 overflow-auto p-8">
+                        <div className="flex-1 overflow-auto p-4 sm:p-8">
                             {isLoading ? (
                                 <div className="h-64 flex flex-col items-center justify-center">
                                     <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
@@ -212,7 +212,8 @@ export default function AdminPanel() {
                                 <div className="p-6 bg-red-50 text-red-600 rounded-2xl text-center font-bold">{error}</div>
                             ) : activeView === 'users' ? (
                                 <div className="rounded-2xl border border-slate-100 overflow-hidden">
-                                    <table className="w-full text-left border-collapse bg-white">
+                                    <div className="overflow-x-auto">
+                                    <table className="w-full text-left border-collapse bg-white min-w-[860px]">
                                         <thead className="bg-slate-50 text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
                                             <tr>
                                                 <th className="p-4">User Info</th>
@@ -257,10 +258,12 @@ export default function AdminPanel() {
                                             ))}
                                         </tbody>
                                     </table>
+                                    </div>
                                 </div>
                             ) : activeView === 'logs' ? (
                                 <div className="rounded-2xl border border-slate-100 overflow-hidden">
-                                    <table className="w-full text-left border-collapse bg-white">
+                                    <div className="overflow-x-auto">
+                                    <table className="w-full text-left border-collapse bg-white min-w-[760px]">
                                         <thead className="bg-slate-50 text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
                                             <tr>
                                                 <th className="p-4">Time</th>
@@ -312,6 +315,7 @@ export default function AdminPanel() {
                                             {!logs.length && <tr><td colSpan="4" className="p-10 text-center font-bold text-slate-400 uppercase tracking-widest text-xs">Belum ada log tercatat.</td></tr>}
                                         </tbody>
                                     </table>
+                                    </div>
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

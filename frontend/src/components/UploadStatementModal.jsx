@@ -302,7 +302,8 @@ export default function UploadStatementModal({ isOpen, onClose }) {
                 </div>
               </div>
               
-              <table className="w-full text-left border-collapse text-sm">
+              <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-sm min-w-[720px]">
                 <thead>
                   <tr className="bg-gray-50 text-gray-600 uppercase tracking-wider text-xs border-b">
                     <th className="p-3 pl-6 font-semibold w-24">Tanggal</th>
@@ -348,6 +349,7 @@ export default function UploadStatementModal({ isOpen, onClose }) {
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
 

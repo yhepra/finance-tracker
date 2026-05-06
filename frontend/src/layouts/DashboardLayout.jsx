@@ -13,7 +13,8 @@ import {
     ChevronsLeft, 
     Menu, 
     User,
-    ShieldHalf
+    ShieldHalf,
+    X
 } from 'lucide-react';
 import { t } from '../i18n';
 import FeedbackModal from '../components/FeedbackModal';
@@ -22,15 +23,21 @@ import NotificationBell from '../components/NotificationBell';
 
 const DashboardLayout = ({ children }) => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+    const [isMobile, setIsMobile] = useState(false);
     const navigate = useNavigate();
     const location = useLocation();
     const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
     const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+    const [isTourOpen, setIsTourOpen] = useState(false);
+    const [tourIndex, setTourIndex] = useState(0);
+    const [tourRect, setTourRect] = useState(null);
     const [i18nTick, setI18nTick] = useState(0);
     const [email, setEmail] = useState(localStorage.getItem('auth_email') || '');
     const [name, setName] = useState(localStorage.getItem('auth_name') || '');
     const [role, setRole] = useState(localStorage.getItem('auth_role') || 'User');
     const displayName = name || email || 'User';
+    const tourKey = 'ft_tour_seen_v1';
 
     const greeting = useMemo(() => {
         const hour = new Date().getHours();
@@ -38,7 +45,7 @@ const DashboardLayout = ({ children }) => {
         if (hour >= 11 && hour < 15) return 'Selamat siang';
         if (hour >= 15 && hour < 18) return 'Selamat sore';
         return 'Selamat malam';
-    }, [i18nTick]); // also dependency on i18n if needed, but Indonesian is clear
+    }, []);
 
     useEffect(() => {
         const sync = () => {
@@ -51,6 +58,22 @@ const DashboardLayout = ({ children }) => {
         return () => {
             window.removeEventListener('storage', sync);
             window.removeEventListener('auth-updated', sync);
+        };
+    }, []);
+
+    useEffect(() => {
+        const mq = window.matchMedia('(max-width: 1023px)');
+        const apply = () => {
+            const next = Boolean(mq.matches);
+            setIsMobile(next);
+            if (!next) setIsMobileSidebarOpen(false);
+        };
+        apply();
+        if (mq.addEventListener) mq.addEventListener('change', apply);
+        else mq.addListener(apply);
+        return () => {
+            if (mq.removeEventListener) mq.removeEventListener('change', apply);
+            else mq.removeListener(apply);
         };
     }, []);
 
@@ -72,6 +95,123 @@ const DashboardLayout = ({ children }) => {
         const one = parts[0] || 'U';
         return one.slice(0, 2).toUpperCase();
     }, [email, name]);
+
+    const tourSteps = useMemo(() => {
+        const steps = [
+            {
+                id: 'nav',
+                title: 'Navigasi',
+                body: 'Gunakan menu di sisi kiri untuk berpindah halaman utama.',
+                selector: '[data-tour="sidebar"]',
+                openSidebar: true
+            },
+            {
+                id: 'scan',
+                title: 'Scan Rekening',
+                body: 'Upload rekening koran PDF (BCA/BNI/Superbank/Bank Jago). Sistem akan membuat draft transaksi yang bisa Anda koreksi sebelum disimpan.',
+                selector: '[data-tour="nav-scan"]',
+                openSidebar: true
+            },
+            {
+                id: 'manual',
+                title: 'Transaksi Manual',
+                body: 'Tambah transaksi secara manual jika tidak menggunakan rekening koran.',
+                selector: '[data-tour="nav-manual"]',
+                openSidebar: true
+            },
+            {
+                id: 'budget',
+                title: 'Budgeting',
+                body: 'Atur anggaran per kategori dan pantau progres. Notifikasi dikirim saat melewati ambang 80% dan 100%.',
+                selector: '[data-tour="nav-budget"]',
+                openSidebar: true
+            },
+            {
+                id: 'settings',
+                title: 'Pengaturan',
+                body: 'Kelola rekening, kategori, bank, integrasi, dan SMTP.',
+                selector: '[data-tour="nav-settings"]',
+                openSidebar: true
+            },
+            {
+                id: 'profile',
+                title: 'Menu Profil',
+                body: 'Akses feedback, account, dan logout dari menu profil.',
+                selector: '[data-tour="profile-menu"]',
+                openSidebar: false
+            }
+        ];
+
+        if (role === 'Admin') {
+            steps.splice(5, 0, {
+                id: 'admin',
+                title: 'Admin Panel',
+                body: 'Kelola data master dan pantau log aktivitas.',
+                selector: '[data-tour="nav-admin"]',
+                openSidebar: true
+            });
+        }
+
+        return steps;
+    }, [role]);
+
+    const closeTour = () => {
+        localStorage.setItem(tourKey, '1');
+        setIsTourOpen(false);
+        setTourRect(null);
+        setTourIndex(0);
+        setIsMobileSidebarOpen(false);
+    };
+
+    const startTour = () => {
+        setIsProfileMenuOpen(false);
+        setTourIndex(0);
+        setIsTourOpen(true);
+    };
+
+    useEffect(() => {
+        const hasSeen = localStorage.getItem(tourKey);
+        const token = localStorage.getItem('auth_token');
+        if (hasSeen || !token) return;
+        const tmr = window.setTimeout(() => {
+            setIsTourOpen(true);
+        }, 700);
+        return () => window.clearTimeout(tmr);
+    }, []);
+
+    useEffect(() => {
+        if (!isTourOpen) return;
+        const step = tourSteps[tourIndex];
+        if (!step) return;
+
+        const run = () => {
+            const el = document.querySelector(step.selector);
+            if (!el) {
+                setTourRect(null);
+                return;
+            }
+            try {
+                el.scrollIntoView({ block: 'center', inline: 'center' });
+            } catch (e) { void e; }
+            const rect = el.getBoundingClientRect();
+            const pad = 10;
+            setTourRect({
+                top: Math.max(0, rect.top - pad),
+                left: Math.max(0, rect.left - pad),
+                width: Math.min(window.innerWidth, rect.width + pad * 2),
+                height: Math.min(window.innerHeight, rect.height + pad * 2),
+                radius: 16
+            });
+        };
+
+        const raf = window.requestAnimationFrame(run);
+        const onResize = () => run();
+        window.addEventListener('resize', onResize);
+        return () => {
+            window.cancelAnimationFrame(raf);
+            window.removeEventListener('resize', onResize);
+        };
+    }, [isTourOpen, tourIndex, tourSteps, isMobile, isSidebarOpen]);
 
     const navItems = useMemo(() => {
         const v = i18nTick;
@@ -116,64 +256,102 @@ const DashboardLayout = ({ children }) => {
         localStorage.removeItem('auth_token');
         localStorage.removeItem('auth_email');
         localStorage.removeItem('auth_name');
+        localStorage.removeItem('auth_role');
         navigate('/login', { replace: true });
     };
+    const tourWantsSidebar = Boolean(isTourOpen && tourSteps[tourIndex]?.openSidebar);
+    const desktopSidebarOpen = isSidebarOpen || tourWantsSidebar;
+    const effectiveMobileSidebarOpen = isMobile ? (isMobileSidebarOpen || tourWantsSidebar) : false;
+    const sidebarExpanded = isMobile ? true : desktopSidebarOpen;
 
     return (
         <div className="flex h-screen bg-slate-50 font-sans overflow-hidden">
-            {/* Sidebar */}
-            <aside 
-                className={`${isSidebarOpen ? 'w-64' : 'w-20'} 
-                bg-blue-900 text-white transition-all duration-300 flex flex-col`}
+            {effectiveMobileSidebarOpen ? (
+                <div
+                    className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px] lg:hidden"
+                    onClick={() => {
+                        if (tourWantsSidebar) return;
+                        setIsMobileSidebarOpen(false);
+                    }}
+                />
+            ) : null}
+
+            <aside
+                data-tour="sidebar"
+                className={`
+                bg-blue-900 text-white transition-all duration-300 flex flex-col
+                fixed inset-y-0 left-0 z-50 w-72 transform lg:static lg:translate-x-0
+                ${effectiveMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:flex
+                ${desktopSidebarOpen ? 'lg:w-64' : 'lg:w-20'}
+                `}
             >
-                {/* Logo Area */}
                 <div className="h-16 flex items-center justify-between px-4 border-b border-blue-800">
-                    {isSidebarOpen ? (
-                      <div className="flex items-center gap-2">
-                        <img src="/logo-icon.png" alt="Alokasi" className="h-8 w-8 object-contain" />
-                        <span className="text-xl font-black tracking-tight text-white">Alokasi</span>
-                      </div>
+                    {sidebarExpanded ? (
+                        <div className="flex items-center gap-2">
+                            <img src="/logo-icon.png" alt="Alokasi" className="h-8 w-8 object-contain" />
+                            <span className="text-xl font-black tracking-tight text-white">Alokasi</span>
+                        </div>
                     ) : (
-                      <img src="/logo-icon.png" alt="Alokasi" className="h-8 w-8 object-contain mx-auto" />
+                        <img src="/logo-icon.png" alt="Alokasi" className="h-8 w-8 object-contain mx-auto" />
                     )}
-                    <button 
-                        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                        className={`p-1 rounded hover:bg-blue-800 ${!isSidebarOpen && 'hidden'}`}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            if (tourWantsSidebar) return;
+                            if (isMobile) setIsMobileSidebarOpen(false);
+                            else setIsSidebarOpen((v) => !v);
+                        }}
+                        className="p-1 rounded hover:bg-blue-800"
+                        aria-label={isMobile ? 'Tutup menu' : 'Toggle sidebar'}
                     >
-                        {isSidebarOpen ? <ChevronsLeft size={24} /> : <Menu size={24} />}
+                        {isMobile ? <X size={24} /> : desktopSidebarOpen ? <ChevronsLeft size={24} /> : <Menu size={24} />}
                     </button>
                 </div>
 
-                {/* Nav Links */}
-                <nav className="flex-1 py-4 flex flex-col gap-2 px-3">
+                <nav className="flex-1 py-4 flex flex-col gap-2 px-3 overflow-auto">
                     {navItems.map((item, index) => (
                         <NavLink
                             key={index}
                             to={item.path}
-                            className={({ isActive }) => 
+                            data-tour={
+                                item.path === '/scan'
+                                    ? 'nav-scan'
+                                    : item.path === '/transaksi'
+                                    ? 'nav-manual'
+                                    : item.path === '/budget'
+                                    ? 'nav-budget'
+                                    : undefined
+                            }
+                            onClick={() => {
+                                if (isMobile) setIsMobileSidebarOpen(false);
+                            }}
+                            className={({ isActive }) =>
                                 `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
                                     isActive ? 'bg-blue-800 text-white' : 'text-blue-200 hover:bg-blue-800 hover:text-white'
-                                } ${!isSidebarOpen && 'justify-center'}`
+                                } ${!sidebarExpanded && 'justify-center'}`
                             }
                         >
                             {item.icon}
-                            {isSidebarOpen && <span className="font-medium">{item.name}</span>}
+                            {sidebarExpanded && <span className="font-medium">{item.name}</span>}
                         </NavLink>
                     ))}
 
-                    {/* Admin Switcher */}
                     {role === 'Admin' && (
                         <div className="mt-4 pt-4 border-t border-blue-800/50">
                             <NavLink
                                 to="/admin"
-                                className={({ isActive }) => 
+                                data-tour="nav-admin"
+                                onClick={() => {
+                                    if (isMobile) setIsMobileSidebarOpen(false);
+                                }}
+                                className={({ isActive }) =>
                                     `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
                                         isActive ? 'bg-amber-500 text-white' : 'bg-blue-800/30 text-amber-200 hover:bg-amber-500 hover:text-white'
-                                    } ${!isSidebarOpen && 'justify-center'}`
+                                    } ${!sidebarExpanded && 'justify-center'}`
                                 }
                             >
                                 <ShieldHalf size={20} />
-                                {isSidebarOpen && <span className="font-bold">Admin Panel</span>}
+                                {sidebarExpanded && <span className="font-bold">Admin Panel</span>}
                             </NavLink>
                         </div>
                     )}
@@ -181,37 +359,46 @@ const DashboardLayout = ({ children }) => {
                 <div className="px-3 pb-4">
                     <NavLink
                         to="/settings"
+                        data-tour="nav-settings"
+                        onClick={() => {
+                            if (isMobile) setIsMobileSidebarOpen(false);
+                        }}
                         className={({ isActive }) =>
                             `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
                                 isActive ? 'bg-blue-800 text-white' : 'text-blue-200 hover:bg-blue-800 hover:text-white'
-                            } ${!isSidebarOpen && 'justify-center'}`
+                            } ${!sidebarExpanded && 'justify-center'}`
                         }
                     >
                         <Settings size={20} />
-                        {isSidebarOpen && <span className="font-medium">{t('nav.settings', 'Settings')}</span>}
+                        {sidebarExpanded && <span className="font-medium">{t('nav.settings', 'Settings')}</span>}
                     </NavLink>
                 </div>
             </aside>
 
-            {/* Main Content Area */}
             <main className="flex-1 flex flex-col h-screen overflow-hidden">
-                {/* Header */}
-                <header className="h-16 bg-white shadow-sm flex items-center justify-between px-8 z-10 shrink-0">
-                    <h2 className="text-xl font-semibold text-slate-800">{greeting}, {displayName}</h2>
-                    <div className="flex items-center gap-2">
-                        {/* Notification Bell */}
-                        <NotificationBell />
-                        {/* Profile Menu */}
-                        <div
-                            className="relative"
-                            tabIndex={0}
-                            onBlur={() => setIsProfileMenuOpen(false)}
+                <header className="h-16 bg-white shadow-sm flex items-center justify-between px-4 sm:px-6 lg:px-8 z-10 shrink-0">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <button
+                            type="button"
+                            className="lg:hidden w-10 h-10 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 flex items-center justify-center"
+                            onClick={() => setIsMobileSidebarOpen(true)}
+                            aria-label="Buka menu"
                         >
+                            <Menu size={20} />
+                        </button>
+                        <h2 className="text-base sm:text-lg lg:text-xl font-semibold text-slate-800 truncate">
+                            {greeting}, {displayName}
+                        </h2>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <NotificationBell />
+                        <div className="relative" tabIndex={0} onBlur={() => setIsProfileMenuOpen(false)}>
                             <button
                                 type="button"
                                 onClick={() => setIsProfileMenuOpen((v) => !v)}
                                 className="w-10 h-10 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center hover:bg-indigo-700"
                                 aria-label="Profile menu"
+                                data-tour="profile-menu"
                             >
                                 {initials || <User size={18} />}
                             </button>
@@ -222,6 +409,14 @@ const DashboardLayout = ({ children }) => {
                                         <div className="text-sm font-semibold text-slate-800 truncate">{displayName}</div>
                                         <div className="text-xs text-slate-500 truncate">{email}</div>
                                     </div>
+                                    <button
+                                        type="button"
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        onClick={startTour}
+                                        className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
+                                    >
+                                        Tur Singkat
+                                    </button>
                                     <button
                                         type="button"
                                         onMouseDown={(e) => e.preventDefault()}
@@ -255,29 +450,108 @@ const DashboardLayout = ({ children }) => {
                     </div>
                 </header>
 
-                {/* Breadcrumbs - Now Fixed */}
-                <div className="px-8 pt-4 pb-4 bg-slate-50 shrink-0">
-                    <div className="inline-flex items-center gap-2 rounded-lg bg-slate-200/50 backdrop-blur-sm px-3 py-2 text-sm text-slate-700 border border-slate-200/40">
-                        {breadcrumbItems.map((b, i) => (
-                            <React.Fragment key={`${b.to}-${b.label}-${i}`}>
-                                {i > 0 ? <span className="text-slate-400">›</span> : null}
-                                {i === breadcrumbItems.length - 1 ? (
-                                    <span className="font-bold text-slate-900">{b.label}</span>
-                                ) : (
-                                    <Link to={b.to} className="hover:text-indigo-600 transition-colors">
-                                        {b.label}
-                                    </Link>
-                                )}
-                            </React.Fragment>
-                        ))}
+                <div className="px-4 sm:px-6 lg:px-8 pt-4 pb-4 bg-slate-50 shrink-0">
+                    <div className="max-w-full overflow-x-auto">
+                        <div className="inline-flex items-center gap-2 rounded-lg bg-slate-200/50 backdrop-blur-sm px-3 py-2 text-sm text-slate-700 border border-slate-200/40 whitespace-nowrap">
+                            {breadcrumbItems.map((b, i) => (
+                                <React.Fragment key={`${b.to}-${b.label}-${i}`}>
+                                    {i > 0 ? <span className="text-slate-400">›</span> : null}
+                                    {i === breadcrumbItems.length - 1 ? (
+                                        <span className="font-bold text-slate-900">{b.label}</span>
+                                    ) : (
+                                        <Link to={b.to} className="hover:text-indigo-600 transition-colors">
+                                            {b.label}
+                                        </Link>
+                                    )}
+                                </React.Fragment>
+                            ))}
+                        </div>
                     </div>
                 </div>
 
-                {/* Page Content - Scrollable */}
-                <div className="flex-1 overflow-auto px-8 pb-8 pt-0">
+                <div className="flex-1 overflow-auto px-4 sm:px-6 lg:px-8 pb-6 sm:pb-8 pt-0">
                     {children}
                 </div>
             </main>
+
+            {isTourOpen ? (
+                <div className="fixed inset-0 z-[200]">
+                    {tourRect ? (
+                        <div
+                            className="fixed"
+                            style={{
+                                top: tourRect.top,
+                                left: tourRect.left,
+                                width: tourRect.width,
+                                height: tourRect.height,
+                                borderRadius: tourRect.radius,
+                                boxShadow: '0 0 0 9999px rgba(2, 6, 23, 0.62)',
+                                border: '2px solid rgba(255, 255, 255, 0.7)'
+                            }}
+                        />
+                    ) : (
+                        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-[2px]" />
+                    )}
+
+                    <div className={`fixed ${isMobile ? 'left-4 right-4 bottom-4' : 'right-6 bottom-6'} max-w-[520px]`}>
+                        <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden">
+                            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
+                                <div className="min-w-0">
+                                    <div className="text-xs font-black uppercase tracking-widest text-blue-700">
+                                        Tur {tourIndex + 1}/{tourSteps.length}
+                                    </div>
+                                    <div className="text-base font-black text-slate-900 tracking-tight truncate">
+                                        {tourSteps[tourIndex]?.title}
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={closeTour}
+                                    className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-slate-800 hover:border-slate-300 transition-all shadow-sm"
+                                    aria-label="Tutup tur"
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+                            <div className="px-5 py-4">
+                                <div className="text-sm font-medium text-slate-700 leading-relaxed">
+                                    {tourSteps[tourIndex]?.body}
+                                </div>
+                                <div className="mt-4 flex items-center justify-between gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={closeTour}
+                                        className="h-10 px-4 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold hover:bg-slate-50"
+                                    >
+                                        Lewati
+                                    </button>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            disabled={tourIndex === 0}
+                                            onClick={() => setTourIndex((x) => Math.max(0, x - 1))}
+                                            className="h-10 px-4 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white"
+                                        >
+                                            Kembali
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const next = tourIndex + 1;
+                                                if (next >= tourSteps.length) closeTour();
+                                                else setTourIndex(next);
+                                            }}
+                                            className="h-10 px-4 rounded-xl bg-slate-900 text-white font-black hover:bg-slate-800"
+                                        >
+                                            {tourIndex + 1 >= tourSteps.length ? 'Selesai' : 'Lanjut'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
 
             <FeedbackModal isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} />
         </div>
