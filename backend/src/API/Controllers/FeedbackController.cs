@@ -16,10 +16,12 @@ namespace FinanceTracker.API.Controllers;
 public class FeedbackController : ControllerBase
 {
     private readonly AppDbContext _db;
+    private readonly FeedbackBugEmailNotifier _bugNotifier;
 
-    public FeedbackController(AppDbContext db)
+    public FeedbackController(AppDbContext db, FeedbackBugEmailNotifier bugNotifier)
     {
         _db = db;
+        _bugNotifier = bugNotifier;
     }
 
     [HttpPost]
@@ -67,7 +69,7 @@ public class FeedbackController : ControllerBase
 
         if (entity.Category == FeedbackCategory.Bug)
         {
-            _ = FeedbackBugEmailNotifier.TryNotifyAsync(entity.Id, entity.UserId, entity.Rating, commentRaw, entity.CreatedAtUtc);
+            _ = _bugNotifier.TryNotifyAsync(entity.Id, entity.UserId, entity.Rating, commentRaw, entity.CreatedAtUtc);
         }
 
         return Ok(new { message = "Feedback berhasil dikirim." });
@@ -102,4 +104,3 @@ public class FeedbackController : ControllerBase
         public string? Comment { get; set; }
     }
 }
-

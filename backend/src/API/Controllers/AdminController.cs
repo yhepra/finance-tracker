@@ -111,6 +111,7 @@ public class AdminController : ControllerBase
                 hasPassword = !string.IsNullOrEmpty(setting.Password),
                 setting.SenderEmail,
                 setting.SenderName,
+                AdminEmail = setting.AdminEmail ?? string.Empty,
                 setting.EnableSsl,
                 setting.UpdatedAtUtc
             }
@@ -136,6 +137,7 @@ public class AdminController : ControllerBase
                 Password = request.Password ?? string.Empty,
                 SenderEmail = request.SenderEmail.Trim(),
                 SenderName = (request.SenderName ?? "Alokasi").Trim(),
+                AdminEmail = (request.AdminEmail ?? string.Empty).Trim(),
                 EnableSsl = request.EnableSsl,
                 UpdatedAtUtc = DateTime.UtcNow
             };
@@ -150,6 +152,7 @@ public class AdminController : ControllerBase
                 setting.Password = request.Password;
             setting.SenderEmail = request.SenderEmail.Trim();
             setting.SenderName = (request.SenderName ?? "Alokasi").Trim();
+            setting.AdminEmail = (request.AdminEmail ?? string.Empty).Trim();
             setting.EnableSsl = request.EnableSsl;
             setting.UpdatedAtUtc = DateTime.UtcNow;
         }
@@ -209,6 +212,6 @@ public class AdminController : ControllerBase
     }
 
     public record SmtpSettingRequest(string Host, int Port, string Username, string? Password,
-        string SenderEmail, string? SenderName, bool EnableSsl);
+        string SenderEmail, string? SenderName, string? AdminEmail, bool EnableSsl);
     public record SmtpTestRequest(string? TestEmail);
 }

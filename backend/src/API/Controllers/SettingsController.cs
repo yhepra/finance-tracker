@@ -129,8 +129,29 @@ public class SettingsController : ControllerBase
     public record UpsertGeneralSettingsRequest(string Language, string DateFormat, string NumberLocale, int? DefaultBankId);
 
     [HttpGet("smtp")]
-    public IActionResult GetSmtp()
+    public async Task<IActionResult> GetSmtp()
     {
+        var setting = await _db.SmtpSettings
+            .AsNoTracking()
+            .OrderBy(s => s.Id)
+            .FirstOrDefaultAsync();
+
+        if (setting != null &&
+            !string.IsNullOrWhiteSpace(setting.Host) &&
+            !string.IsNullOrWhiteSpace(setting.Username))
+        {
+            return Ok(new SmtpSettingsModel
+            {
+                Host = setting.Host,
+                Port = setting.Port > 0 ? setting.Port : 587,
+                Username = setting.Username,
+                Password = string.Empty,
+                SenderEmail = setting.SenderEmail,
+                SenderName = setting.SenderName,
+                AdminEmail = setting.AdminEmail ?? string.Empty
+            });
+        }
+
         var path = Path.Combine(Directory.GetCurrentDirectory(), "SmtpSettings.json");
         if (!System.IO.File.Exists(path))
         {
@@ -159,6 +180,7 @@ public class SettingsController : ControllerBase
                 Password = request.Password ?? string.Empty,
                 SenderEmail = (request.SenderEmail ?? string.Empty).Trim(),
                 SenderName = string.IsNullOrWhiteSpace(request.SenderName) ? "Alokasi" : request.SenderName.Trim(),
+                AdminEmail = (request.AdminEmail ?? string.Empty).Trim(),
                 EnableSsl = true,
                 UpdatedAtUtc = DateTime.UtcNow
             };
@@ -173,7 +195,7 @@ public class SettingsController : ControllerBase
                 setting.Password = request.Password;
             setting.SenderEmail = (request.SenderEmail ?? string.Empty).Trim();
             setting.SenderName = string.IsNullOrWhiteSpace(request.SenderName) ? "Alokasi" : request.SenderName.Trim();
-            setting.EnableSsl = true;
+            setting.AdminEmail = (request.AdminEmail ?? string.Empty).Trim();
             setting.UpdatedAtUtc = DateTime.UtcNow;
         }
 
@@ -185,14 +207,42 @@ public class SettingsController : ControllerBase
     [HttpPost("smtp/test")]
     public async Task<IActionResult> TestSmtp()
     {
-        var path = Path.Combine(Directory.GetCurrentDirectory(), "SmtpSettings.json");
-        if (!System.IO.File.Exists(path))
-            return BadRequest(new { message = "Konfigurasi SMTP belum disimpan." });
+        var smtpDb = await _db.SmtpSettings
+            .AsNoTracking()
+            .OrderBy(s => s.Id)
+            .FirstOrDefaultAsync();
 
-        var json = System.IO.File.ReadAllText(path);
-        var smtp = System.Text.Json.JsonSerializer.Deserialize<SmtpSettingsModel>(json);
+        SmtpSettingsModel? smtp = null;
+        var enableSsl = true;
+
+        if (smtpDb != null &&
+            !string.IsNullOrWhiteSpace(smtpDb.Host) &&
+            !string.IsNullOrWhiteSpace(smtpDb.Username))
+        {
+            smtp = new SmtpSettingsModel
+            {
+                Host = smtpDb.Host,
+                Port = smtpDb.Port > 0 ? smtpDb.Port : 587,
+                Username = smtpDb.Username,
+                Password = smtpDb.Password ?? string.Empty,
+                SenderEmail = smtpDb.SenderEmail,
+                SenderName = smtpDb.SenderName,
+                AdminEmail = smtpDb.AdminEmail ?? string.Empty
+            };
+            enableSsl = smtpDb.EnableSsl;
+        }
+        else
+        {
+            var path = Path.Combine(Directory.GetCurrentDirectory(), "SmtpSettings.json");
+            if (System.IO.File.Exists(path))
+            {
+                var json = System.IO.File.ReadAllText(path);
+                smtp = System.Text.Json.JsonSerializer.Deserialize<SmtpSettingsModel>(json);
+            }
+        }
+
         if (smtp == null || string.IsNullOrWhiteSpace(smtp.Host) || string.IsNullOrWhiteSpace(smtp.Username))
-            return BadRequest(new { message = "Konfigurasi SMTP tidak lengkap." });
+            return BadRequest(new { message = "Konfigurasi SMTP belum disimpan atau tidak lengkap." });
 
         var email = User.FindFirstValue(ClaimTypes.Email) ?? User.FindFirstValue(JwtRegisteredClaimNames.Email);
         if (string.IsNullOrWhiteSpace(email))
@@ -203,7 +253,7 @@ public class SettingsController : ControllerBase
             using var client = new System.Net.Mail.SmtpClient(smtp.Host, smtp.Port)
             {
                 Credentials = new System.Net.NetworkCredential(smtp.Username, smtp.Password),
-                EnableSsl = true
+                EnableSsl = enableSsl
             };
             var mailMessage = new System.Net.Mail.MailMessage
             {

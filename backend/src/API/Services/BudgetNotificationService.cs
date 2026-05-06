@@ -1,23 +1,22 @@
 using FinanceTracker.Application.Interfaces;
-using FinanceTracker.API.Controllers;
 using FinanceTracker.Domain.Enums;
 using FinanceTracker.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using System.Net.Mail;
 using System.Text;
-using System.Text.Json;
 
 namespace FinanceTracker.API.Services;
 
 public class BudgetNotificationService : IBudgetNotificationService
 {
-    private readonly AppDbContext _db;
     private readonly IBackgroundTaskQueue _queue;
+    private readonly IServiceScopeFactory _scopeFactory;
 
-    public BudgetNotificationService(AppDbContext db, IBackgroundTaskQueue queue)
+    public BudgetNotificationService(IBackgroundTaskQueue queue, IServiceScopeFactory scopeFactory)
     {
-        _db = db;
         _queue = queue;
+        _scopeFactory = scopeFactory;
     }
 
     public void EnqueueThresholdNotifications(int userId, IReadOnlyList<BudgetThresholdEvent> events)
@@ -26,18 +25,29 @@ public class BudgetNotificationService : IBudgetNotificationService
 
         _queue.Enqueue(async ct =>
         {
-            var smtp = await ReadSmtpAsync(ct);
+            using var scope = _scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            var smtp = await db.SmtpSettings
+                .AsNoTracking()
+                .OrderBy(s => s.Id)
+                .FirstOrDefaultAsync(ct);
+
             if (smtp == null) return;
             if (string.IsNullOrWhiteSpace(smtp.Host) || string.IsNullOrWhiteSpace(smtp.Username)) return;
 
-            var user = await _db.Users.AsNoTracking().SingleOrDefaultAsync(u => u.Id == userId, ct);
-            if (user == null) return;
-            if (string.IsNullOrWhiteSpace(user.Email)) return;
+            var userEmail = await db.Users
+                .AsNoTracking()
+                .Where(u => u.Id == userId)
+                .Select(u => u.Email)
+                .SingleOrDefaultAsync(ct);
 
-            using var client = new SmtpClient(smtp.Host, smtp.Port)
+            if (string.IsNullOrWhiteSpace(userEmail)) return;
+
+            using var client = new SmtpClient(smtp.Host, smtp.Port > 0 ? smtp.Port : 587)
             {
-                Credentials = new System.Net.NetworkCredential(smtp.Username, smtp.Password),
-                EnableSsl = true
+                Credentials = new System.Net.NetworkCredential(smtp.Username, smtp.Password ?? string.Empty),
+                EnableSsl = smtp.EnableSsl
             };
 
             var fromEmail = !string.IsNullOrWhiteSpace(smtp.SenderEmail) ? smtp.SenderEmail : smtp.Username;
@@ -69,7 +79,7 @@ public class BudgetNotificationService : IBudgetNotificationService
                     IsBodyHtml = false
                 };
 
-                mailMessage.To.Add(user.Email);
+                mailMessage.To.Add(userEmail);
                 await client.SendMailAsync(mailMessage, ct);
             }
         });
@@ -94,21 +104,5 @@ public class BudgetNotificationService : IBudgetNotificationService
     private static int GetIsoWeek(DateTime date)
     {
         return System.Globalization.ISOWeek.GetWeekOfYear(date);
-    }
-
-    private static async Task<SmtpSettingsModel?> ReadSmtpAsync(CancellationToken ct)
-    {
-        var path = Path.Combine(Directory.GetCurrentDirectory(), "SmtpSettings.json");
-        if (!File.Exists(path)) return null;
-
-        try
-        {
-            var json = await File.ReadAllTextAsync(path, ct);
-            return JsonSerializer.Deserialize<SmtpSettingsModel>(json);
-        }
-        catch
-        {
-            return null;
-        }
     }
 }

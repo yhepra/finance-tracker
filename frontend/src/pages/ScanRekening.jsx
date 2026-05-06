@@ -412,11 +412,25 @@ export default function ScanRekening() {
                           <button
                             type="button"
                             onClick={() => uploadToPreview(file)}
-                            className="mt-3 inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                            className="mt-3 inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 shadow-sm"
                           >
-                            <Upload className="mr-2" size={16} />
+                            <Loader2 className={`mr-2 ${isProcessing ? 'animate-spin' : 'hidden'}`} size={16} />
                             Proses Ulang
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => document.getElementById('file-upload-input').click()}
+                            className="mt-2 text-xs text-blue-600 font-medium hover:underline"
+                          >
+                            Ganti File
+                          </button>
+                          <input
+                            id="file-upload-input"
+                            type="file"
+                            accept=".pdf"
+                            className="sr-only"
+                            onChange={(e) => onPickFile(e.target.files?.[0] || null)}
+                          />
                         </div>
                       ) : (
                         <>
@@ -425,6 +439,7 @@ export default function ScanRekening() {
                             <label className="relative cursor-pointer rounded-md font-medium text-blue-600 hover:text-blue-500">
                               <span>Pilih file</span>
                               <input
+                                id="file-upload-input"
                                 type="file"
                                 accept=".pdf"
                                 className="sr-only"

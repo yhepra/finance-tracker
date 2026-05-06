@@ -41,6 +41,7 @@ builder.Services.AddScoped<TransactionUploadService>();
 builder.Services.AddScoped<TransactionGeminiScanService>();
 builder.Services.AddScoped<IBudgetRepository, BudgetRepository>();
 builder.Services.AddScoped<IBudgetNotificationService, BudgetNotificationService>();
+builder.Services.AddSingleton<FeedbackBugEmailNotifier>();
 builder.Services.AddSingleton<IBackgroundTaskQueue, BackgroundTaskQueue>();
 builder.Services.AddHostedService<QueuedHostedService>();
 builder.Services.AddHttpContextAccessor();

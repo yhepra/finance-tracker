@@ -13,6 +13,7 @@ public class SmtpSetting
     public string Password { get; set; } = string.Empty;
     public string SenderEmail { get; set; } = string.Empty;
     public string SenderName { get; set; } = "Alokasi";
+    public string? AdminEmail { get; set; }
     public bool EnableSsl { get; set; } = true;
     public DateTime UpdatedAtUtc { get; set; }
 }
