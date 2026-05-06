@@ -32,9 +32,20 @@ namespace FinanceTracker.Infrastructure.Migrations
                 DEALLOCATE PREPARE createIndexStatement;
             ");
 
-            // Step 2: Drop foreign key constraints that depend on the old index
-            migrationBuilder.Sql(
-                "ALTER TABLE `Budgets` DROP FOREIGN KEY IF EXISTS `FK_Budgets_Users_UserId`;");
+            // Step 2: Drop foreign key constraints that depend on the old index (idempotent for MySQL)
+            migrationBuilder.Sql(@"
+                SET @dbname = DATABASE();
+                SET @tablename = 'Budgets';
+                SET @fkname = 'FK_Budgets_Users_UserId';
+                SET @preparedStatement = (SELECT IF(
+                    (SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS WHERE TABLE_SCHEMA = @dbname AND TABLE_NAME = @tablename AND CONSTRAINT_NAME = @fkname AND CONSTRAINT_TYPE = 'FOREIGN KEY') > 0,
+                    'ALTER TABLE `Budgets` DROP FOREIGN KEY `FK_Budgets_Users_UserId`',
+                    'SELECT 1'
+                ));
+                PREPARE dropFkStatement FROM @preparedStatement;
+                EXECUTE dropFkStatement;
+                DEALLOCATE PREPARE dropFkStatement;
+            ");
 
             // Step 3: Drop the old index (idempotent for MySQL)
             migrationBuilder.Sql(@"
@@ -51,9 +62,20 @@ namespace FinanceTracker.Infrastructure.Migrations
                 DEALLOCATE PREPARE dropIndexStatement;
             ");
 
-            // Step 4: Recreate the FK (EF Core uses UserId with a separate index)
-            migrationBuilder.Sql(
-                "ALTER TABLE `Budgets` ADD CONSTRAINT `FK_Budgets_Users_UserId` FOREIGN KEY (`UserId`) REFERENCES `Users`(`Id`) ON DELETE CASCADE;");
+            // Step 4: Recreate the FK (idempotent for MySQL)
+            migrationBuilder.Sql(@"
+                SET @dbname = DATABASE();
+                SET @tablename = 'Budgets';
+                SET @fkname = 'FK_Budgets_Users_UserId';
+                SET @preparedStatement = (SELECT IF(
+                    (SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS WHERE TABLE_SCHEMA = @dbname AND TABLE_NAME = @tablename AND CONSTRAINT_NAME = @fkname AND CONSTRAINT_TYPE = 'FOREIGN KEY') > 0,
+                    'SELECT 1',
+                    'ALTER TABLE `Budgets` ADD CONSTRAINT `FK_Budgets_Users_UserId` FOREIGN KEY (`UserId`) REFERENCES `Users`(`Id`) ON DELETE CASCADE'
+                ));
+                PREPARE addFkStatement FROM @preparedStatement;
+                EXECUTE addFkStatement;
+                DEALLOCATE PREPARE addFkStatement;
+            ");
         }
 
         /// <inheritdoc />
