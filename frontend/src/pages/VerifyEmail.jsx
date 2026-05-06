@@ -32,12 +32,8 @@ export default function VerifyEmail() {
         <div className="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200 border border-slate-100 p-10 text-center">
             {/* Consistent Logo */}
             <div className="flex items-center justify-center gap-2 mb-10">
-              <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-200">
-                <Wallet size={20} />
-              </div>
-              <span className="text-2xl font-black tracking-tighter text-slate-900">
-                Fin<span className="text-blue-600">Track</span>
-              </span>
+              <img src="/logo-icon.png" alt="Alokasi" className="h-10 w-10 object-contain" />
+              <span className="text-2xl font-black tracking-tight text-slate-900">Alokasi</span>
             </div>
           {status === 'loading' && (
             <>

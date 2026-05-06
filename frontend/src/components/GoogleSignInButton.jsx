@@ -3,7 +3,12 @@ import { getGoogleClientId } from '../config/env'
 
 export default function GoogleSignInButton({ onCredential, label = 'Lanjut dengan Google' }) {
   const containerRef = useRef(null)
+  const onCredentialRef = useRef(onCredential)
   const clientId = getGoogleClientId()
+
+  useEffect(() => {
+    onCredentialRef.current = onCredential
+  }, [onCredential])
 
   useEffect(() => {
     if (!clientId) return
@@ -26,7 +31,7 @@ export default function GoogleSignInButton({ onCredential, label = 'Lanjut denga
         ux_mode: 'popup',
         callback: (resp) => {
           const cred = resp?.credential
-          if (cred) onCredential(cred)
+          if (cred && onCredentialRef.current) onCredentialRef.current(cred)
         },
       })
 
@@ -48,7 +53,7 @@ export default function GoogleSignInButton({ onCredential, label = 'Lanjut denga
       canceled = true
       window.google?.accounts?.id?.cancel()
     }
-  }, [clientId, onCredential])
+  }, [clientId])
 
   return (
     <div className="flex flex-col items-center justify-center w-full">
