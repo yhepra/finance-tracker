@@ -55,6 +55,7 @@ public class StatementScanController : ControllerBase
 
         try
         {
+            var requestId = HttpContext.TraceIdentifier;
             using var stream = file.OpenReadStream();
             var result = await _scan.PreviewBankStatementAsync(
                 userId.Value, stream, bankCodeNormalized, pdfPassword,
@@ -76,7 +77,7 @@ public class StatementScanController : ControllerBase
             await _log.LogInfoAsync(
                 "Scan",
                 $"Preview scan rekening: {bankCodeNormalized} ({result.Transactions.Count} transaksi)",
-                $"Bank={bankCodeNormalized}, OpeningBalance={(result.OpeningBalance.HasValue ? result.OpeningBalance.Value.ToString() : "null")}, Year={(result.StatementYear.HasValue ? result.StatementYear.Value.ToString() : "null")}, Month={(result.StatementMonth.HasValue ? result.StatementMonth.Value.ToString() : "null")}",
+                $"RequestId={requestId}, Bank={bankCodeNormalized}, FileName={file.FileName}, FileBytes={file.Length}, ContentType={file.ContentType}, PdfPassword={(string.IsNullOrWhiteSpace(pdfPassword) ? "no" : "yes")}, OpeningBalance={(result.OpeningBalance.HasValue ? result.OpeningBalance.Value.ToString() : "null")}, Year={(result.StatementYear.HasValue ? result.StatementYear.Value.ToString() : "null")}, Month={(result.StatementMonth.HasValue ? result.StatementMonth.Value.ToString() : "null")}",
                 userId.Value
             );
 
@@ -88,23 +89,39 @@ public class StatementScanController : ControllerBase
                 statementMonth = result.StatementMonth,
                 accountNumber = result.AccountNumber,
                 autoSavedBalance = autoSavedBalanceInfo,
-                message = "Preview generated successfully."
+                message = "Preview generated successfully.",
+                referenceId = requestId
             });
         }
         catch (InvalidOperationException ex)
         {
-            await _log.LogWarningAsync("Scan", $"Scan rekening gagal: {bankCodeNormalized}", ex.Message, userId.Value);
-            return BadRequest(new { message = ex.Message });
+            var requestId = HttpContext.TraceIdentifier;
+            var details = ex.Data.Contains("Details") ? ex.Data["Details"]?.ToString() : null;
+            var raw = ex.Data.Contains("Raw") ? ex.Data["Raw"]?.ToString() : null;
+            var rawShort = string.IsNullOrWhiteSpace(raw) ? null : (raw.Length <= 1200 ? raw : raw[..1200]);
+
+            var detailText =
+                $"RequestId={requestId}, Bank={bankCodeNormalized}, FileName={file.FileName}, FileBytes={file.Length}, ContentType={file.ContentType}, PdfPassword={(string.IsNullOrWhiteSpace(pdfPassword) ? "no" : "yes")}"
+                + (string.IsNullOrWhiteSpace(details) ? "" : $"\n\nDetails:\n{details}")
+                + (string.IsNullOrWhiteSpace(rawShort) ? "" : $"\n\nRaw (truncated):\n{rawShort}");
+
+            await _log.LogWarningAsync("Scan", $"Scan rekening gagal: {bankCodeNormalized} (Ref: {requestId})", detailText, userId.Value);
+
+            return BadRequest(new { message = $"{ex.Message} (Ref: {requestId})", referenceId = requestId });
         }
         catch (OperationCanceledException)
         {
-            await _log.LogWarningAsync("Scan", $"Scan rekening dibatalkan: {bankCodeNormalized}", null, userId.Value);
-            return BadRequest(new { message = "Permintaan dibatalkan." });
+            var requestId = HttpContext.TraceIdentifier;
+            await _log.LogWarningAsync("Scan", $"Scan rekening dibatalkan: {bankCodeNormalized} (Ref: {requestId})", $"FileName={file.FileName}, FileBytes={file.Length}", userId.Value);
+            return BadRequest(new { message = $"Permintaan dibatalkan. (Ref: {requestId})", referenceId = requestId });
         }
         catch (Exception ex)
         {
-            await _log.LogErrorAsync("Scan", $"Scan rekening error: {bankCodeNormalized}", ex.Message, userId.Value, ex.ToString());
-            return StatusCode(500, new { message = "Terjadi kesalahan saat scan rekening.", details = ex.Message });
+            var requestId = HttpContext.TraceIdentifier;
+            var detailText = $"RequestId={requestId}, Bank={bankCodeNormalized}, FileName={file.FileName}, FileBytes={file.Length}, ContentType={file.ContentType}, PdfPassword={(string.IsNullOrWhiteSpace(pdfPassword) ? "no" : "yes")}\n\nError:\n{ex.Message}";
+
+            await _log.LogErrorAsync("Scan", $"Scan rekening error: {bankCodeNormalized} (Ref: {requestId})", detailText, userId.Value, ex.ToString());
+            return StatusCode(500, new { message = $"Terjadi kesalahan saat scan rekening. (Ref: {requestId})", referenceId = requestId });
         }
     }
 

@@ -394,7 +394,15 @@ Extract EVERY single transaction. The opening_balance field is critical - find i
         }
 
         if (status >= HttpStatusCode.BadRequest)
-            return new GeminiStatementScanResult(false, "Scan rekening gagal.", Array.Empty<FinanceTracker.Application.DTOs.PdfTransactionRow>(), Raw: body);
+        {
+            var err = TryExtractGeminiErrorMessage(body);
+            var shortErr = string.IsNullOrWhiteSpace(err) ? null : (err.Length <= 220 ? err : err[..220]);
+            var msg = shortErr == null
+                ? $"Scan rekening gagal (Gemini HTTP {(int)status})."
+                : $"Scan rekening gagal (Gemini HTTP {(int)status}): {shortErr}";
+
+            return new GeminiStatementScanResult(false, msg, Array.Empty<FinanceTracker.Application.DTOs.PdfTransactionRow>(), Raw: body, Details: err);
+        }
 
         if (!TryExtractModelText(body, out var modelText2))
             return new GeminiStatementScanResult(false, "Respon Gemini tidak valid.", Array.Empty<FinanceTracker.Application.DTOs.PdfTransactionRow>(), Raw: body);
@@ -819,5 +827,35 @@ Transactions:
         return body.Contains("NOT_FOUND", StringComparison.OrdinalIgnoreCase)
             || body.Contains("is not found", StringComparison.OrdinalIgnoreCase)
             || body.Contains("not found", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string? TryExtractGeminiErrorMessage(string body)
+    {
+        if (string.IsNullOrWhiteSpace(body)) return null;
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            var root = doc.RootElement;
+
+            if (root.ValueKind == JsonValueKind.Object &&
+                root.TryGetProperty("error", out var errorObj) &&
+                errorObj.ValueKind == JsonValueKind.Object)
+            {
+                var code = errorObj.TryGetProperty("code", out var c) && c.ValueKind == JsonValueKind.Number ? c.GetInt32() : (int?)null;
+                var status = errorObj.TryGetProperty("status", out var s) ? s.GetString() : null;
+                var message = errorObj.TryGetProperty("message", out var m) ? m.GetString() : null;
+
+                var parts = new List<string>();
+                if (code.HasValue) parts.Add($"Code={code.Value}");
+                if (!string.IsNullOrWhiteSpace(status)) parts.Add($"Status={status}");
+                if (!string.IsNullOrWhiteSpace(message)) parts.Add(message!);
+                if (parts.Count > 0) return string.Join(" | ", parts);
+            }
+        }
+        catch
+        {
+        }
+
+        return body;
     }
 }

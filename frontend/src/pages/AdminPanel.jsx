@@ -303,6 +303,11 @@ export default function AdminPanel() {
                                                         <div className="text-xs text-slate-900 font-medium mb-1 line-clamp-2" title={l.message}>
                                                             {l.message}
                                                         </div>
+                                                        {l.detail ? (
+                                                            <div className="text-[10px] text-slate-500 font-medium line-clamp-2" title={l.detail}>
+                                                                {l.detail}
+                                                            </div>
+                                                        ) : null}
                                                         {l.ipAddress && (
                                                             <div className="text-[9px] text-slate-400 font-mono flex items-center gap-1">
                                                                 <Zap size={8} />

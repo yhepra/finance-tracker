@@ -39,7 +39,12 @@ public sealed class TransactionGeminiScanService
     {
         var scan = await _gemini.ScanBankStatementPdfAsync(userId, pdfStream, bankCode, pdfPassword, cancellationToken);
         if (!scan.Success)
-            throw new InvalidOperationException(scan.Message);
+        {
+            var ex = new InvalidOperationException(scan.Message);
+            if (!string.IsNullOrWhiteSpace(scan.Details)) ex.Data["Details"] = scan.Details;
+            if (!string.IsNullOrWhiteSpace(scan.Raw)) ex.Data["Raw"] = scan.Raw;
+            throw ex;
+        }
 
         var categories = await _categoryRepo.GetAllAsync();
         var categoryByName = categories
