@@ -214,4 +214,117 @@ public class AdminController : ControllerBase
     public record SmtpSettingRequest(string Host, int Port, string Username, string? Password,
         string SenderEmail, string? SenderName, string? AdminEmail, bool EnableSsl);
     public record SmtpTestRequest(string? TestEmail);
+
+    // ─────────────────────────────────────────────────────────────────
+    // BROADCAST ANNOUNCEMENTS (Notifications)
+    // ─────────────────────────────────────────────────────────────────
+
+    [HttpPost("broadcasts")]
+    public async Task<IActionResult> CreateBroadcast([FromBody] CreateBroadcastRequest request, CancellationToken ct)
+    {
+        var title = (request.Title ?? string.Empty).Trim();
+        var message = (request.Message ?? string.Empty).Trim();
+        var severity = (request.Severity ?? "info").Trim().ToLowerInvariant();
+        var actionUrl = string.IsNullOrWhiteSpace(request.ActionUrl) ? null : request.ActionUrl.Trim();
+
+        if (title.Length == 0) return BadRequest(new { message = "Judul wajib diisi." });
+        if (message.Length == 0) return BadRequest(new { message = "Isi pengumuman wajib diisi." });
+        if (title.Length > 120) return BadRequest(new { message = "Judul maksimal 120 karakter." });
+        if (message.Length > 2000) return BadRequest(new { message = "Isi pengumuman maksimal 2000 karakter." });
+
+        var allowedSeverity = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "info", "success", "warning", "error" };
+        if (!allowedSeverity.Contains(severity))
+            return BadRequest(new { message = "Severity tidak valid. Gunakan: info | success | warning | error." });
+
+        if (actionUrl != null && !actionUrl.StartsWith("/", StringComparison.Ordinal))
+            return BadRequest(new { message = "ActionUrl harus berupa path yang diawali '/' (contoh: /dashboard)." });
+
+        var userIds = await _db.Users
+            .AsNoTracking()
+            .Select(u => u.Id)
+            .ToListAsync(ct);
+
+        if (userIds.Count == 0)
+            return BadRequest(new { message = "Tidak ada user terdaftar untuk dikirimi pengumuman." });
+
+        var createdAtUtc = DateTime.UtcNow;
+        var broadcastId = Guid.NewGuid().ToString("N");
+        var type = "broadcast:" + broadcastId;
+
+        var items = new List<Notification>(userIds.Count);
+        foreach (var userId in userIds)
+        {
+            items.Add(new Notification
+            {
+                UserId = userId,
+                Type = type,
+                Severity = severity,
+                Title = title,
+                Message = message,
+                ActionUrl = actionUrl,
+                IsRead = false,
+                CreatedAtUtc = createdAtUtc
+            });
+        }
+
+        _db.Notifications.AddRange(items);
+        await _db.SaveChangesAsync(ct);
+
+        return Ok(new
+        {
+            message = "Broadcast berhasil dikirim ke semua user.",
+            data = new
+            {
+                id = broadcastId,
+                title,
+                message,
+                severity,
+                actionUrl,
+                createdAtUtc,
+                recipients = userIds.Count
+            }
+        });
+    }
+
+    [HttpGet("broadcasts")]
+    public async Task<IActionResult> GetBroadcasts([FromQuery] int take = 50, CancellationToken ct = default)
+    {
+        if (take <= 0) take = 50;
+        if (take > 200) take = 200;
+
+        var rows = await _db.Notifications
+            .AsNoTracking()
+            .Where(n => n.Type.StartsWith("broadcast:"))
+            .GroupBy(n => n.Type)
+            .Select(g => new
+            {
+                type = g.Key,
+                title = g.Max(x => x.Title),
+                message = g.Max(x => x.Message),
+                severity = g.Max(x => x.Severity),
+                actionUrl = g.Max(x => x.ActionUrl),
+                createdAtUtc = g.Max(x => x.CreatedAtUtc),
+                recipients = g.Count(),
+                readCount = g.Count(x => x.IsRead)
+            })
+            .OrderByDescending(x => x.createdAtUtc)
+            .Take(take)
+            .ToListAsync(ct);
+
+        var data = rows.Select(x => new
+        {
+            id = x.type.StartsWith("broadcast:") ? x.type["broadcast:".Length..] : x.type,
+            x.title,
+            x.message,
+            x.severity,
+            x.actionUrl,
+            x.createdAtUtc,
+            x.recipients,
+            x.readCount
+        });
+
+        return Ok(new { data });
+    }
+
+    public record CreateBroadcastRequest(string Title, string Message, string? Severity, string? ActionUrl);
 }

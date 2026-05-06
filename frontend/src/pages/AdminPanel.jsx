@@ -9,6 +9,7 @@ import {
     Database,
     Zap,
     MessageSquare,
+    Megaphone,
     X,
     Star,
     Mail,
@@ -34,6 +35,14 @@ export default function AdminPanel() {
     const [users, setUsers] = useState([]);
     const [feedbacks, setFeedbacks] = useState([]);
     const [logs, setLogs] = useState([]);
+    const [broadcasts, setBroadcasts] = useState([]);
+    const [broadcastTitle, setBroadcastTitle] = useState('');
+    const [broadcastMessage, setBroadcastMessage] = useState('');
+    const [broadcastSeverity, setBroadcastSeverity] = useState('info');
+    const [broadcastActionUrl, setBroadcastActionUrl] = useState('');
+    const [broadcastSending, setBroadcastSending] = useState(false);
+    const [broadcastSuccess, setBroadcastSuccess] = useState('');
+    const [broadcastError, setBroadcastError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
 
@@ -76,6 +85,65 @@ export default function AdminPanel() {
             setError('Gagal memuat log aktivitas.');
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const loadBroadcasts = async () => {
+        setIsLoading(true);
+        setError('');
+        setBroadcastError('');
+        setBroadcastSuccess('');
+        try {
+            const res = await axios.get('/api/admin/broadcasts');
+            setBroadcasts(res.data.data || []);
+            setActiveView('broadcast');
+        } catch {
+            setError('Gagal memuat riwayat broadcast.');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const sendBroadcast = async () => {
+        setBroadcastError('');
+        setBroadcastSuccess('');
+
+        const title = (broadcastTitle || '').trim();
+        const message = (broadcastMessage || '').trim();
+        const severity = (broadcastSeverity || 'info').trim().toLowerCase();
+        const actionUrl = (broadcastActionUrl || '').trim();
+
+        if (!title) {
+            setBroadcastError('Judul pengumuman wajib diisi.');
+            return;
+        }
+        if (!message) {
+            setBroadcastError('Isi pengumuman wajib diisi.');
+            return;
+        }
+
+        setBroadcastSending(true);
+        try {
+            const res = await axios.post('/api/admin/broadcasts', {
+                title,
+                message,
+                severity,
+                actionUrl: actionUrl ? actionUrl : null
+            });
+
+            const created = res.data?.data;
+            if (created) {
+                setBroadcasts(prev => [{ ...created, readCount: 0 }, ...prev]);
+            }
+            setBroadcastTitle('');
+            setBroadcastMessage('');
+            setBroadcastActionUrl('');
+            setBroadcastSeverity('info');
+            setBroadcastSuccess(res.data?.message || 'Broadcast berhasil dikirim.');
+        } catch (err) {
+            setBroadcastError(err?.response?.data?.message || 'Gagal mengirim broadcast.');
+        } finally {
+            setBroadcastSending(false);
         }
     };
 
@@ -123,6 +191,13 @@ export default function AdminPanel() {
             icon: <Clock className="text-rose-600" size={32} />,
             action: loadLogs,
             color: 'bg-rose-50'
+        },
+        {
+            title: 'Broadcast Pengumuman',
+            desc: 'Kirim pengumuman ke semua user dan tampilkan di Notifikasi.',
+            icon: <Megaphone className="text-blue-600" size={32} />,
+            action: loadBroadcasts,
+            color: 'bg-blue-50'
         }
     ];
 
@@ -172,22 +247,26 @@ export default function AdminPanel() {
                                 <div className={`p-3 rounded-2xl ${
                                     activeView === 'users' ? 'bg-amber-100/50 text-amber-600' : 
                                     activeView === 'logs' ? 'bg-rose-100/50 text-rose-600' :
+                                    activeView === 'broadcast' ? 'bg-blue-100/50 text-blue-600' :
                                     'bg-emerald-100/50 text-emerald-600'
                                 }`}>
                                     {activeView === 'users' ? <Users size={24} /> : 
                                      activeView === 'logs' ? <Clock size={24} /> :
+                                     activeView === 'broadcast' ? <Megaphone size={24} /> :
                                      <MessageSquare size={24} />}
                                 </div>
                                 <div>
                                     <h2 className="text-xl font-black text-slate-900 leading-none">
                                         {activeView === 'users' ? 'User Management' : 
                                          activeView === 'logs' ? 'Activity & Error Log' :
+                                         activeView === 'broadcast' ? 'Broadcast Pengumuman' :
                                          'Daftar Umpan Balik'}
                                     </h2>
                                     <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mt-1.5 flex items-center gap-1.5">
                                         Total: {
                                             activeView === 'users' ? users.length : 
                                             activeView === 'logs' ? logs.length :
+                                            activeView === 'broadcast' ? broadcasts.length :
                                             feedbacks.length
                                         } data
                                     </p>
@@ -210,6 +289,132 @@ export default function AdminPanel() {
                                 </div>
                             ) : error ? (
                                 <div className="p-6 bg-red-50 text-red-600 rounded-2xl text-center font-bold">{error}</div>
+                            ) : activeView === 'broadcast' ? (
+                                <div className="space-y-6">
+                                    <div className="rounded-3xl border border-slate-200 bg-white p-5 sm:p-7">
+                                        <div className="flex items-center justify-between gap-4 mb-5">
+                                            <div>
+                                                <div className="text-sm font-black text-slate-900">Kirim Pengumuman</div>
+                                                <div className="text-xs text-slate-500 font-medium">Pengumuman ini akan masuk ke notifikasi semua user.</div>
+                                            </div>
+                                        </div>
+
+                                        {broadcastError ? (
+                                            <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-2xl text-sm font-bold border border-red-100">
+                                                {broadcastError}
+                                            </div>
+                                        ) : null}
+                                        {broadcastSuccess ? (
+                                            <div className="mb-4 p-3 bg-emerald-50 text-emerald-700 rounded-2xl text-sm font-bold border border-emerald-100">
+                                                {broadcastSuccess}
+                                            </div>
+                                        ) : null}
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="md:col-span-2">
+                                                <label className="block text-sm font-semibold text-slate-700 mb-1">Judul</label>
+                                                <input
+                                                    type="text"
+                                                    value={broadcastTitle}
+                                                    onChange={(e) => setBroadcastTitle(e.target.value)}
+                                                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                                                    placeholder="Contoh: Maintenance sistem malam ini"
+                                                />
+                                            </div>
+
+                                            <div className="md:col-span-2">
+                                                <label className="block text-sm font-semibold text-slate-700 mb-1">Isi Pengumuman</label>
+                                                <textarea
+                                                    value={broadcastMessage}
+                                                    onChange={(e) => setBroadcastMessage(e.target.value)}
+                                                    className="w-full min-h-[120px] rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                                                    placeholder="Tulis detail pengumuman untuk semua user..."
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-sm font-semibold text-slate-700 mb-1">Severity</label>
+                                                <select
+                                                    value={broadcastSeverity}
+                                                    onChange={(e) => setBroadcastSeverity(e.target.value)}
+                                                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                                                >
+                                                    <option value="info">Info</option>
+                                                    <option value="success">Success</option>
+                                                    <option value="warning">Warning</option>
+                                                    <option value="error">Error</option>
+                                                </select>
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-sm font-semibold text-slate-700 mb-1">Action URL (Opsional)</label>
+                                                <input
+                                                    type="text"
+                                                    value={broadcastActionUrl}
+                                                    onChange={(e) => setBroadcastActionUrl(e.target.value)}
+                                                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                                                    placeholder="/dashboard atau /budget"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-5 flex items-center justify-end gap-3">
+                                            <button
+                                                onClick={sendBroadcast}
+                                                disabled={broadcastSending}
+                                                className="px-5 py-3 rounded-2xl bg-blue-600 text-white font-black hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                                            >
+                                                {broadcastSending ? 'Mengirim...' : 'Kirim Broadcast'}
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="rounded-3xl border border-slate-100 bg-white overflow-hidden">
+                                        <div className="px-5 sm:px-7 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                                            <div className="text-sm font-black text-slate-900">Riwayat Broadcast</div>
+                                            <button
+                                                onClick={loadBroadcasts}
+                                                className="text-xs font-black text-blue-600 hover:text-blue-800"
+                                            >
+                                                Refresh
+                                            </button>
+                                        </div>
+
+                                        <div className="p-4 sm:p-7 space-y-3">
+                                            {broadcasts.map(b => (
+                                                <div key={b.id} className="p-4 rounded-2xl border border-slate-200 hover:border-slate-300 transition-colors">
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div>
+                                                            <div className="text-sm font-black text-slate-900">{b.title}</div>
+                                                            <div className="text-xs text-slate-500 font-medium mt-1 whitespace-pre-line">{b.message}</div>
+                                                            {b.actionUrl ? (
+                                                                <div className="mt-2 text-[11px] font-bold text-slate-500">
+                                                                    Action: <span className="font-mono">{b.actionUrl}</span>
+                                                                </div>
+                                                            ) : null}
+                                                        </div>
+                                                        <div className="text-right shrink-0">
+                                                            <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                                                {b.severity}
+                                                            </div>
+                                                            <div className="mt-1 text-[11px] font-bold text-slate-700">
+                                                                {new Date(b.createdAtUtc).toLocaleString()}
+                                                            </div>
+                                                            <div className="mt-1 text-[10px] text-slate-400 font-bold">
+                                                                Read {b.readCount || 0}/{b.recipients || 0}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {!broadcasts.length ? (
+                                                <div className="py-10 text-center font-bold text-slate-400 uppercase tracking-widest text-xs">
+                                                    Belum ada broadcast.
+                                                </div>
+                                            ) : null}
+                                        </div>
+                                    </div>
+                                </div>
                             ) : activeView === 'users' ? (
                                 <div className="rounded-2xl border border-slate-100 overflow-hidden">
                                     <div className="overflow-x-auto">
