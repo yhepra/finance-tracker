@@ -38,6 +38,8 @@ services:
       Jwt__Audience: ${JWT_AUDIENCE:-FinanceTracker}
       OAuth__Google__ClientId: ${GOOGLE_CLIENT_ID:-}
       App__FrontendUrl: https://alokasi.my.id
+      Secrets__Key: ${SECRETS_KEY:-default-production-secrets-key-please-change-it-in-env-file!}
+      Secrets__DataKey: ${SECRETS_DATA_KEY:-default-production-data-key-please-change-it-in-env-file!}
     ports:
       - "5116:5116"
     networks:
