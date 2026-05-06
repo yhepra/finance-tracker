@@ -245,6 +245,39 @@ CREATE TABLE IF NOT EXISTS `AppLogs` (
 ) CHARACTER SET=utf8mb4;
 ");
     }
+
+    try
+    {
+        var hasSmtpSetting = await db.SmtpSettings.AnyAsync();
+        if (!hasSmtpSetting)
+        {
+            var path = Path.Combine(Directory.GetCurrentDirectory(), "SmtpSettings.json");
+            if (System.IO.File.Exists(path))
+            {
+                var json = await System.IO.File.ReadAllTextAsync(path);
+                var smtpJson = System.Text.Json.JsonSerializer.Deserialize<FinanceTracker.API.Controllers.SmtpSettingsModel>(json);
+                if (smtpJson != null && !string.IsNullOrEmpty(smtpJson.Host))
+                {
+                    db.SmtpSettings.Add(new SmtpSetting
+                    {
+                        Host = smtpJson.Host,
+                        Port = smtpJson.Port > 0 ? smtpJson.Port : 587,
+                        Username = smtpJson.Username ?? string.Empty,
+                        Password = smtpJson.Password ?? string.Empty,
+                        SenderEmail = smtpJson.SenderEmail ?? string.Empty,
+                        SenderName = smtpJson.SenderName ?? "Finance Tracker",
+                        EnableSsl = true,
+                        UpdatedAtUtc = DateTime.UtcNow
+                    });
+                    await db.SaveChangesAsync();
+                }
+            }
+        }
+    }
+    catch
+    {
+        // Suppress errors during SMTP settings initialization
+    }
 }
 
 // Configure the HTTP request pipeline.

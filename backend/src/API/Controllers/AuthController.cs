@@ -29,6 +29,9 @@ public class AuthController : ControllerBase
         _google = google;
     }
 
+    // ─────────────────────────────────────────────────────────────────
+    // REGISTER — Simpan ke PendingRegistrations, BUKAN ke Users
+    // ─────────────────────────────────────────────────────────────────
     [AllowAnonymous]
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
@@ -36,73 +39,125 @@ public class AuthController : ControllerBase
         var email = (request.Email ?? string.Empty).Trim().ToLowerInvariant();
 
         if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(request.Password))
-        {
             return BadRequest(new { message = "Email dan password wajib diisi." });
-        }
 
         if (request.Password.Length < 8)
-        {
             return BadRequest(new { message = "Password minimal 8 karakter." });
-        }
 
-        var exists = await _db.Users.AnyAsync(u => u.Email == email);
-        if (exists)
-        {
+        // Cek apakah email sudah terdaftar di Users (akun aktif)
+        var existsInUsers = await _db.Users.AnyAsync(u => u.Email == email);
+        if (existsInUsers)
             return Conflict(new { message = "Email sudah terdaftar." });
-        }
+
+        // Hapus pending registration lama (jika ada) untuk email ini
+        var oldPending = await _db.PendingRegistrations
+            .Where(p => p.Email == email)
+            .ToListAsync();
+        if (oldPending.Count > 0)
+            _db.PendingRegistrations.RemoveRange(oldPending);
 
         var (hash, salt) = PasswordHashing.HashPassword(request.Password);
-        // Use URL-safe base64 token (no +/=/ chars that get mangled in URLs)
-        var tokenBytes = System.Security.Cryptography.RandomNumberGenerator.GetBytes(24);
+        var tokenBytes = RandomNumberGenerator.GetBytes(24);
         var verificationToken = Convert.ToBase64String(tokenBytes)
             .Replace("+", "-").Replace("/", "_").Replace("=", "");
 
-        var user = new User
+        var pending = new PendingRegistration
         {
             Email = email,
             PasswordHash = hash,
             PasswordSalt = salt,
-            IsEmailVerified = false,
-            EmailVerificationToken = verificationToken,
-            EmailVerificationTokenExpiry = DateTime.UtcNow.AddHours(24),
-            IsOnboardingCompleted = false,
-            Role = email.Equals("yhepra@gmail.com", StringComparison.OrdinalIgnoreCase) ? "Admin" : "User",
+            VerificationToken = verificationToken,
+            ExpiresAtUtc = DateTime.UtcNow.AddHours(24),
             CreatedAtUtc = DateTime.UtcNow
         };
 
-        _db.Users.Add(user);
+        _db.PendingRegistrations.Add(pending);
         await _db.SaveChangesAsync();
 
-        try {
-            await SendVerificationEmailAsync(user.Email, verificationToken);
-        } catch { /* Suppress in dev */ }
+        try
+        {
+            await SendEmailAsync(email, verificationToken, EmailType.Verification);
+        }
+        catch { /* Suppress email errors in dev */ }
 
-        return Ok(new { 
+        return Ok(new
+        {
             message = "Registrasi berhasil. Silakan cek email Anda untuk verifikasi.",
-            email = user.Email
+            email
         });
     }
 
+    // ─────────────────────────────────────────────────────────────────
+    // VERIFY EMAIL — Pindahkan dari PendingRegistrations ke Users
+    // ─────────────────────────────────────────────────────────────────
     [AllowAnonymous]
     [HttpPost("verify-email")]
     public async Task<IActionResult> VerifyEmail([FromBody] VerifyEmailRequest request)
     {
         var tokenTrimmed = (request.Token ?? string.Empty).Trim();
-        var user = await _db.Users.SingleOrDefaultAsync(
+
+        // Cek token di PendingRegistrations (pendekatan baru)
+        var pending = await _db.PendingRegistrations
+            .SingleOrDefaultAsync(p => p.VerificationToken == tokenTrimmed);
+
+        if (pending != null)
+        {
+            if (pending.ExpiresAtUtc < DateTime.UtcNow)
+            {
+                _db.PendingRegistrations.Remove(pending);
+                await _db.SaveChangesAsync();
+                return BadRequest(new { message = "Token verifikasi sudah kadaluarsa. Silakan daftar ulang." });
+            }
+
+            // Cek lagi apakah email sudah terdaftar (race condition check)
+            var alreadyExists = await _db.Users.AnyAsync(u => u.Email == pending.Email);
+            if (alreadyExists)
+            {
+                _db.PendingRegistrations.Remove(pending);
+                await _db.SaveChangesAsync();
+                return Conflict(new { message = "Email sudah terdaftar." });
+            }
+
+            // Pindahkan ke Users
+            var user = new User
+            {
+                Email = pending.Email,
+                PasswordHash = pending.PasswordHash,
+                PasswordSalt = pending.PasswordSalt,
+                IsEmailVerified = true,
+                EmailVerificationToken = null,
+                EmailVerificationTokenExpiry = null,
+                IsOnboardingCompleted = false,
+                Role = pending.Email.Equals("yhepra@gmail.com", StringComparison.OrdinalIgnoreCase) ? "Admin" : "User",
+                CreatedAtUtc = DateTime.UtcNow
+            };
+
+            _db.Users.Add(user);
+            _db.PendingRegistrations.Remove(pending);
+            await _db.SaveChangesAsync();
+
+            return Ok(new { message = "Email berhasil diverifikasi. Silakan login." });
+        }
+
+        // Fallback: cek token di Users (akun lama sebelum perubahan ini)
+        var existingUser = await _db.Users.SingleOrDefaultAsync(
             u => u.EmailVerificationToken == tokenTrimmed);
-        if (user == null || user.EmailVerificationTokenExpiry < DateTime.UtcNow)
+        if (existingUser == null || existingUser.EmailVerificationTokenExpiry < DateTime.UtcNow)
         {
             return BadRequest(new { message = "Token verifikasi tidak valid atau sudah kadaluarsa. Coba daftar ulang." });
         }
 
-        user.IsEmailVerified = true;
-        user.EmailVerificationToken = null;
-        user.EmailVerificationTokenExpiry = null;
+        existingUser.IsEmailVerified = true;
+        existingUser.EmailVerificationToken = null;
+        existingUser.EmailVerificationTokenExpiry = null;
         await _db.SaveChangesAsync();
 
         return Ok(new { message = "Email berhasil diverifikasi. Silakan login." });
     }
 
+    // ─────────────────────────────────────────────────────────────────
+    // LOGIN
+    // ─────────────────────────────────────────────────────────────────
     [AllowAnonymous]
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
@@ -110,15 +165,11 @@ public class AuthController : ControllerBase
         var email = (request.Email ?? string.Empty).Trim().ToLowerInvariant();
 
         if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(request.Password))
-        {
             return BadRequest(new { message = "Email dan password wajib diisi." });
-        }
 
         var user = await _db.Users.SingleOrDefaultAsync(u => u.Email == email);
         if (user == null)
-        {
             return Unauthorized(new { message = "Email atau password salah." });
-        }
 
         bool ok;
         try
@@ -131,20 +182,17 @@ public class AuthController : ControllerBase
         }
 
         if (!ok)
-        {
             return Unauthorized(new { message = "Email atau password salah." });
-        }
 
         if (!user.IsEmailVerified)
         {
-            // Grace period: pre-migration accounts have no token stored — auto-verify them
+            // Grace period: akun lama tanpa token — auto-verify
             if (user.EmailVerificationToken == null)
             {
                 user.IsEmailVerified = true;
                 if (!user.IsOnboardingCompleted)
                     user.IsOnboardingCompleted = !string.IsNullOrWhiteSpace(user.FullName);
-                
-                // Force admin role for the specific email
+
                 if (user.Email.Equals("yhepra@gmail.com", StringComparison.OrdinalIgnoreCase))
                     user.Role = "Admin";
 
@@ -152,14 +200,14 @@ public class AuthController : ControllerBase
             }
             else
             {
-                // Also check for admin role even if verified
                 if (user.Email.Equals("yhepra@gmail.com", StringComparison.OrdinalIgnoreCase) && user.Role != "Admin")
                 {
                     user.Role = "Admin";
                     await _db.SaveChangesAsync();
                 }
-                
-                return Unauthorized(new { 
+
+                return Unauthorized(new
+                {
                     message = "Email Anda belum diverifikasi. Silakan cek email Anda.",
                     requireVerification = true
                 });
@@ -172,14 +220,12 @@ public class AuthController : ControllerBase
         }
 
         var token = CreateJwt(user);
-        return Ok(new AuthResponse(
-            token, 
-            user.Email, 
-            user.FullName, 
-            user.IsOnboardingCompleted,
-            user.Role));
+        return Ok(new AuthResponse(token, user.Email, user.FullName, user.IsOnboardingCompleted, user.Role));
     }
 
+    // ─────────────────────────────────────────────────────────────────
+    // GOOGLE LOGIN
+    // ─────────────────────────────────────────────────────────────────
     [AllowAnonymous]
     [HttpPost("google")]
     public async Task<IActionResult> GoogleLogin([FromBody] GoogleLoginRequest request)
@@ -220,9 +266,7 @@ public class AuthController : ControllerBase
             }
 
             if (email.Equals("yhepra@gmail.com", StringComparison.OrdinalIgnoreCase) && user.Role != "Admin")
-            {
                 user.Role = "Admin";
-            }
 
             if (string.IsNullOrWhiteSpace(user.FullName) && !string.IsNullOrWhiteSpace(fullName))
             {
@@ -233,10 +277,21 @@ public class AuthController : ControllerBase
             await _db.SaveChangesAsync();
         }
 
+        // Hapus juga pending registration dengan email ini (jika ada)
+        var pendingList = await _db.PendingRegistrations.Where(p => p.Email == email).ToListAsync();
+        if (pendingList.Count > 0)
+        {
+            _db.PendingRegistrations.RemoveRange(pendingList);
+            await _db.SaveChangesAsync();
+        }
+
         var token = CreateJwt(user);
         return Ok(new AuthResponse(token, user.Email, user.FullName, user.IsOnboardingCompleted, user.Role));
     }
 
+    // ─────────────────────────────────────────────────────────────────
+    // COMPLETE ONBOARDING
+    // ─────────────────────────────────────────────────────────────────
     [Authorize]
     [HttpPost("complete-onboarding")]
     public async Task<IActionResult> CompleteOnboarding([FromBody] UpdateProfileRequest request)
@@ -253,7 +308,7 @@ public class AuthController : ControllerBase
         user.FullName = request.FullName.Trim();
         user.DateOfBirth = request.DateOfBirth;
         user.IsOnboardingCompleted = true;
-        
+
         await _db.SaveChangesAsync();
 
         var token = CreateJwt(user);
@@ -282,9 +337,7 @@ public class AuthController : ControllerBase
 
         var name = (request.FullName ?? string.Empty).Trim();
         if (name.Length > 120)
-        {
             return BadRequest(new { message = "Nama terlalu panjang." });
-        }
 
         user.FullName = name;
         user.DateOfBirth = request.DateOfBirth;
@@ -294,59 +347,9 @@ public class AuthController : ControllerBase
         return Ok(new { email = user.Email, name = user.FullName, dateOfBirth = user.DateOfBirth, token });
     }
 
-    private string CreateJwt(User user)
-    {
-        var jwtKey = _configuration["Jwt:Key"] ?? string.Empty;
-        var jwtIssuer = _configuration["Jwt:Issuer"];
-        var jwtAudience = _configuration["Jwt:Audience"];
-
-        if (string.IsNullOrWhiteSpace(jwtKey) && _environment.IsDevelopment())
-        {
-            jwtKey = "dev-jwt-key-change-me-please-dev-jwt-key-change-me-please";
-        }
-
-        if (string.IsNullOrWhiteSpace(jwtKey))
-        {
-            throw new InvalidOperationException("JWT key is not configured. Set Jwt:Key in configuration (e.g. environment variable JWT__KEY).");
-        }
-
-        var claims = new List<Claim>
-        {
-            new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-            new(JwtRegisteredClaimNames.Email, user.Email),
-            new(ClaimTypes.Email, user.Email),
-            new(ClaimTypes.Name, user.FullName ?? string.Empty),
-            new("dob", user.DateOfBirth.HasValue ? user.DateOfBirth.Value.ToString("yyyy-MM-dd") : string.Empty),
-            new("verified", user.IsEmailVerified.ToString().ToLower()),
-            new("onboarded", user.IsOnboardingCompleted.ToString().ToLower()),
-            new(ClaimTypes.Role, user.Role)
-        };
-
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
-        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-        var token = new JwtSecurityToken(
-            issuer: string.IsNullOrWhiteSpace(jwtIssuer) ? null : jwtIssuer,
-            audience: string.IsNullOrWhiteSpace(jwtAudience) ? null : jwtAudience,
-            claims: claims,
-            expires: DateTime.UtcNow.AddDays(1),
-            signingCredentials: creds
-        );
-
-        return new JwtSecurityTokenHandler().WriteToken(token);
-    }
-
-    public record RegisterRequest(string Email, string Password);
-    public record LoginRequest(string Email, string Password);
-    public record GoogleLoginRequest(string Credential);
-    public record AuthResponse(string Token, string Email, string Name, bool IsOnboardingCompleted = false, string Role = "User");
-    public record VerifyEmailRequest(string Token);
-    public record UpdateProfileRequest(string FullName, DateOnly? DateOfBirth);
-    public record ChangePasswordRequest(string OldPassword, string NewPassword);
-    public record ForgotPasswordRequest(string Email);
-    public record ResetPasswordRequest(string Token, string NewPassword);
-    public record PasswordOnlyRequest(string Password);
-
+    // ─────────────────────────────────────────────────────────────────
+    // VERIFY PASSWORD / CHANGE PASSWORD
+    // ─────────────────────────────────────────────────────────────────
     [Authorize]
     [HttpPost("verify-password")]
     public async Task<IActionResult> VerifyPasswordOnly([FromBody] PasswordOnlyRequest request)
@@ -355,10 +358,12 @@ public class AuthController : ControllerBase
         if (userId == null) return Unauthorized();
         var user = await _db.Users.SingleOrDefaultAsync(u => u.Id == userId);
         if (user == null) return Unauthorized();
-        try {
+        try
+        {
             if (!PasswordHashing.VerifyPassword(request.Password, user.PasswordHash, user.PasswordSalt))
                 return BadRequest(new { message = "Password salah." });
-        } catch { return BadRequest(new { message = "Password salah." }); }
+        }
+        catch { return BadRequest(new { message = "Password salah." }); }
         return Ok();
     }
 
@@ -375,9 +380,7 @@ public class AuthController : ControllerBase
         try
         {
             if (!PasswordHashing.VerifyPassword(request.OldPassword, user.PasswordHash, user.PasswordSalt))
-            {
                 return BadRequest(new { message = "Password lama salah." });
-            }
         }
         catch (FormatException)
         {
@@ -385,9 +388,7 @@ public class AuthController : ControllerBase
         }
 
         if (string.IsNullOrWhiteSpace(request.NewPassword) || request.NewPassword.Length < 8)
-        {
             return BadRequest(new { message = "Password baru minimal 8 karakter." });
-        }
 
         var (hash, salt) = PasswordHashing.HashPassword(request.NewPassword);
         user.PasswordHash = hash;
@@ -397,20 +398,22 @@ public class AuthController : ControllerBase
         return Ok(new { message = "Password berhasil diubah." });
     }
 
+    // ─────────────────────────────────────────────────────────────────
+    // FORGOT / RESET PASSWORD
+    // ─────────────────────────────────────────────────────────────────
     [AllowAnonymous]
     [HttpPost("forgot-password")]
     public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
     {
         var email = (request.Email ?? string.Empty).Trim().ToLowerInvariant();
         var user = await _db.Users.SingleOrDefaultAsync(u => u.Email == email);
-        if (user == null) {
+        if (user == null)
             return Ok(new { message = "Jika email terdaftar, link reset password telah dikirim." });
-        }
 
         var jwtKey = _configuration["Jwt:Key"];
         if (string.IsNullOrWhiteSpace(jwtKey)) jwtKey = "dev-jwt-key-change-me-please-dev-jwt-key-change-me-please";
         var specialKey = jwtKey + user.PasswordHash;
-        
+
         var claims = new List<Claim>
         {
             new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
@@ -421,45 +424,19 @@ public class AuthController : ControllerBase
         var key = new SymmetricSecurityKey(keyBytes);
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
-        var token = new JwtSecurityToken(
+        var resetToken = new JwtSecurityToken(
             claims: claims,
             expires: DateTime.UtcNow.AddHours(2),
             signingCredentials: creds
         );
 
-        var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
+        var tokenString = new JwtSecurityTokenHandler().WriteToken(resetToken);
 
-        var path = Path.Combine(Directory.GetCurrentDirectory(), "SmtpSettings.json");
-        if (System.IO.File.Exists(path))
+        try
         {
-            var json = System.IO.File.ReadAllText(path);
-            var smtp = System.Text.Json.JsonSerializer.Deserialize<SmtpSettingsModel>(json);
-            if (smtp != null && !string.IsNullOrEmpty(smtp.Host) && !string.IsNullOrEmpty(smtp.Username))
-            {
-                try
-                {
-                    using var client = new System.Net.Mail.SmtpClient(smtp.Host, smtp.Port)
-                    {
-                        Credentials = new System.Net.NetworkCredential(smtp.Username, smtp.Password),
-                        EnableSsl = true
-                    };
-                    var frontendUrl = _configuration["App:FrontendUrl"] ?? "http://localhost:5174";
-                    var mailMessage = new System.Net.Mail.MailMessage
-                    {
-                        From = new System.Net.Mail.MailAddress(smtp.SenderEmail, smtp.SenderName),
-                        Subject = "Reset Password Finance Tracker",
-                        Body = $"Klik link berikut untuk reset password: {frontendUrl.TrimEnd('/')}/reset-password?token={tokenString}",
-                        IsBodyHtml = false
-                    };
-                    mailMessage.To.Add(user.Email);
-                    await client.SendMailAsync(mailMessage);
-                }
-                catch (Exception)
-                {
-                    // Ignore for now
-                }
-            }
+            await SendEmailAsync(user.Email, tokenString, EmailType.ResetPassword);
         }
+        catch { /* Suppress */ }
 
         return Ok(new { message = "Jika email terdaftar, link reset password telah dikirim." });
     }
@@ -469,9 +446,7 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Token) || string.IsNullOrWhiteSpace(request.NewPassword) || request.NewPassword.Length < 8)
-        {
             return BadRequest(new { message = "Token tidak valid atau password kurang dari 8 karakter." });
-        }
 
         var handler = new JwtSecurityTokenHandler();
         if (!handler.CanReadToken(request.Token)) return BadRequest(new { message = "Token tidak valid." });
@@ -499,7 +474,7 @@ public class AuthController : ControllerBase
                 ValidateIssuer = false,
                 ValidateAudience = false,
                 ClockSkew = TimeSpan.Zero
-            }, out var validatedToken);
+            }, out _);
         }
         catch
         {
@@ -514,12 +489,146 @@ public class AuthController : ControllerBase
         return Ok(new { message = "Password berhasil di-reset. Silakan login dengan password baru." });
     }
 
+    // ─────────────────────────────────────────────────────────────────
+    // PRIVATE HELPERS
+    // ─────────────────────────────────────────────────────────────────
+    private string CreateJwt(User user)
+    {
+        var jwtKey = _configuration["Jwt:Key"] ?? string.Empty;
+        var jwtIssuer = _configuration["Jwt:Issuer"];
+        var jwtAudience = _configuration["Jwt:Audience"];
+
+        if (string.IsNullOrWhiteSpace(jwtKey) && _environment.IsDevelopment())
+            jwtKey = "dev-jwt-key-change-me-please-dev-jwt-key-change-me-please";
+
+        if (string.IsNullOrWhiteSpace(jwtKey))
+            throw new InvalidOperationException("JWT key is not configured.");
+
+        var claims = new List<Claim>
+        {
+            new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+            new(JwtRegisteredClaimNames.Email, user.Email),
+            new(ClaimTypes.Email, user.Email),
+            new(ClaimTypes.Name, user.FullName ?? string.Empty),
+            new("dob", user.DateOfBirth.HasValue ? user.DateOfBirth.Value.ToString("yyyy-MM-dd") : string.Empty),
+            new("verified", user.IsEmailVerified.ToString().ToLower()),
+            new("onboarded", user.IsOnboardingCompleted.ToString().ToLower()),
+            new(ClaimTypes.Role, user.Role)
+        };
+
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
+        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+        var token = new JwtSecurityToken(
+            issuer: string.IsNullOrWhiteSpace(jwtIssuer) ? null : jwtIssuer,
+            audience: string.IsNullOrWhiteSpace(jwtAudience) ? null : jwtAudience,
+            claims: claims,
+            expires: DateTime.UtcNow.AddDays(1),
+            signingCredentials: creds
+        );
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
     private int? GetUserId()
     {
         var sub = User.FindFirstValue(JwtRegisteredClaimNames.Sub) ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (int.TryParse(sub, out var userId)) return userId;
         return null;
     }
+
+    private enum EmailType { Verification, ResetPassword }
+
+    /// <summary>
+    /// Kirim email menggunakan SMTP setting dari database.
+    /// Fallback ke SmtpSettings.json jika database belum ada setting.
+    /// </summary>
+    private async Task SendEmailAsync(string toEmail, string token, EmailType type)
+    {
+        var frontendUrl = _configuration["App:FrontendUrl"] ?? "http://localhost:5174";
+
+        // Ambil SMTP dari database
+        var smtpDb = await _db.SmtpSettings.OrderBy(s => s.Id).FirstOrDefaultAsync();
+
+        string host, username, password, senderEmail, senderName;
+        int port;
+        bool enableSsl;
+
+        if (smtpDb != null && !string.IsNullOrEmpty(smtpDb.Host))
+        {
+            host = smtpDb.Host;
+            port = smtpDb.Port;
+            username = smtpDb.Username;
+            password = smtpDb.Password;
+            senderEmail = smtpDb.SenderEmail;
+            senderName = smtpDb.SenderName;
+            enableSsl = smtpDb.EnableSsl;
+        }
+        else
+        {
+            // Fallback ke SmtpSettings.json (untuk backward compatibility)
+            var path = Path.Combine(Directory.GetCurrentDirectory(), "SmtpSettings.json");
+            if (!System.IO.File.Exists(path)) return;
+
+            var json = await System.IO.File.ReadAllTextAsync(path);
+            var smtp = System.Text.Json.JsonSerializer.Deserialize<SmtpSettingsModel>(json);
+            if (smtp == null || string.IsNullOrEmpty(smtp.Host)) return;
+
+            host = smtp.Host;
+            port = smtp.Port;
+            username = smtp.Username;
+            password = smtp.Password;
+            senderEmail = smtp.SenderEmail;
+            senderName = smtp.SenderName;
+            enableSsl = true;
+        }
+
+        string subject, body;
+        if (type == EmailType.Verification)
+        {
+            subject = "Verifikasi Email Finance Tracker";
+            body = $"Halo, silakan klik link berikut untuk memverifikasi akun Anda:\n\n" +
+                   $"{frontendUrl.TrimEnd('/')}/verify-email?token={token}\n\n" +
+                   $"Link ini berlaku selama 24 jam.";
+        }
+        else
+        {
+            subject = "Reset Password Finance Tracker";
+            body = $"Klik link berikut untuk reset password:\n\n" +
+                   $"{frontendUrl.TrimEnd('/')}/reset-password?token={token}\n\n" +
+                   $"Link ini berlaku selama 2 jam.";
+        }
+
+        using var client = new System.Net.Mail.SmtpClient(host, port)
+        {
+            Credentials = new System.Net.NetworkCredential(username, password),
+            EnableSsl = enableSsl
+        };
+
+        var mailMessage = new System.Net.Mail.MailMessage
+        {
+            From = new System.Net.Mail.MailAddress(senderEmail, senderName),
+            Subject = subject,
+            Body = body,
+            IsBodyHtml = false
+        };
+        mailMessage.To.Add(toEmail);
+        await client.SendMailAsync(mailMessage);
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // RECORDS
+    // ─────────────────────────────────────────────────────────────────
+    public record RegisterRequest(string Email, string Password);
+    public record LoginRequest(string Email, string Password);
+    public record GoogleLoginRequest(string Credential);
+    public record AuthResponse(string Token, string Email, string Name, bool IsOnboardingCompleted = false, string Role = "User");
+    public record VerifyEmailRequest(string Token);
+    public record UpdateProfileRequest(string FullName, DateOnly? DateOfBirth);
+    public record ChangePasswordRequest(string OldPassword, string NewPassword);
+    public record ForgotPasswordRequest(string Email);
+    public record ResetPasswordRequest(string Token, string NewPassword);
+    public record PasswordOnlyRequest(string Password);
 
     private static class PasswordHashing
     {
@@ -537,7 +646,6 @@ public class AuthController : ControllerBase
                 HashAlgorithmName.SHA256,
                 KeySize
             );
-
             return (Convert.ToBase64String(hashBytes), Convert.ToBase64String(saltBytes));
         }
 
@@ -551,35 +659,8 @@ public class AuthController : ControllerBase
                 HashAlgorithmName.SHA256,
                 KeySize
             );
-
             var storedHashBytes = Convert.FromBase64String(storedHash);
             return CryptographicOperations.FixedTimeEquals(hashBytes, storedHashBytes);
         }
-    }
-
-    private async Task SendVerificationEmailAsync(string email, string token)
-    {
-        var path = Path.Combine(Directory.GetCurrentDirectory(), "SmtpSettings.json");
-        if (!System.IO.File.Exists(path)) return;
-
-        var json = await System.IO.File.ReadAllTextAsync(path);
-        var smtp = System.Text.Json.JsonSerializer.Deserialize<SmtpSettingsModel>(json);
-        if (smtp == null || string.IsNullOrEmpty(smtp.Host)) return;
-
-        using var client = new System.Net.Mail.SmtpClient(smtp.Host, smtp.Port)
-        {
-            Credentials = new System.Net.NetworkCredential(smtp.Username, smtp.Password),
-            EnableSsl = true
-        };
-        var frontendUrl = _configuration["App:FrontendUrl"] ?? "http://localhost:5174";
-        var mailMessage = new System.Net.Mail.MailMessage
-        {
-            From = new System.Net.Mail.MailAddress(smtp.SenderEmail, smtp.SenderName),
-            Subject = "Verifikasi Email Finance Tracker",
-            Body = $"Halo, silakan klik link berikut untuk memverifikasi akun Anda: {frontendUrl.TrimEnd('/')}/verify-email?token={token}\n\nLink ini berlaku selama 24 jam.",
-            IsBodyHtml = false
-        };
-        mailMessage.To.Add(email);
-        await client.SendMailAsync(mailMessage);
     }
 }

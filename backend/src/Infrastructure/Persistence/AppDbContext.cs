@@ -32,6 +32,8 @@ public class AppDbContext : DbContext
     public DbSet<UserDirectoryTerm> UserDirectoryTerms { get; set; }
     public DbSet<AppLog> AppLogs { get; set; }
     public DbSet<Notification> Notifications { get; set; }
+    public DbSet<PendingRegistration> PendingRegistrations { get; set; }
+    public DbSet<SmtpSetting> SmtpSettings { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -273,5 +275,21 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<Feedback>()
             .HasIndex(x => x.CreatedAtUtc);
+
+        // PendingRegistration: index on token and email for fast lookups
+        modelBuilder.Entity<PendingRegistration>()
+            .HasIndex(x => x.VerificationToken)
+            .IsUnique();
+
+        modelBuilder.Entity<PendingRegistration>()
+            .HasIndex(x => x.Email);
+
+        modelBuilder.Entity<PendingRegistration>()
+            .HasIndex(x => x.ExpiresAtUtc);
+
+        // SmtpSetting: encrypt password
+        modelBuilder.Entity<SmtpSetting>()
+            .Property(x => x.Password)
+            .HasConversion(stringConverter);
     }
 }
