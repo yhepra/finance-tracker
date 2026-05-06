@@ -246,40 +246,8 @@ CREATE TABLE IF NOT EXISTS `AppLogs` (
 ");
     }
 
-    try
-    {
-        var hasSmtpSetting = await db.SmtpSettings.AnyAsync();
-        if (!hasSmtpSetting)
-        {
-            var path = Path.Combine(Directory.GetCurrentDirectory(), "SmtpSettings.json");
-            if (System.IO.File.Exists(path))
-            {
-                var json = await System.IO.File.ReadAllTextAsync(path);
-                var smtpJson = System.Text.Json.JsonSerializer.Deserialize<FinanceTracker.API.Controllers.SmtpSettingsModel>(json);
-                if (smtpJson != null &&
-                    !string.IsNullOrWhiteSpace(smtpJson.Host) &&
-                    !string.IsNullOrWhiteSpace(smtpJson.Username))
-                {
-                    db.SmtpSettings.Add(new SmtpSetting
-                    {
-                        Host = smtpJson.Host.Trim(),
-                        Port = smtpJson.Port > 0 ? smtpJson.Port : 587,
-                        Username = smtpJson.Username.Trim(),
-                        Password = smtpJson.Password ?? string.Empty,
-                        SenderEmail = (smtpJson.SenderEmail ?? string.Empty).Trim(),
-                        SenderName = string.IsNullOrWhiteSpace(smtpJson.SenderName) ? "Alokasi" : smtpJson.SenderName.Trim(),
-                        EnableSsl = true,
-                        UpdatedAtUtc = DateTime.UtcNow
-                    });
-                    await db.SaveChangesAsync();
-                }
-            }
-        }
-    }
-    catch
-    {
-        // Suppress errors during SMTP settings initialization
-    }
+    // SMTP settings are managed via Admin Panel and stored in the database.
+    // No longer seeding from SmtpSettings.json to prevent accidental overwrites.
 }
 
 // Configure the HTTP request pipeline.
