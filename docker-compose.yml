@@ -37,6 +37,7 @@ services:
       Jwt__Issuer: ${JWT_ISSUER:-FinanceTracker}
       Jwt__Audience: ${JWT_AUDIENCE:-FinanceTracker}
       OAuth__Google__ClientId: ${GOOGLE_CLIENT_ID:-}
+      App__FrontendUrl: https://alokasi.my.id
     ports:
       - "5116:5116"
     networks:

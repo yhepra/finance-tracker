@@ -443,11 +443,12 @@ public class AuthController : ControllerBase
                         Credentials = new System.Net.NetworkCredential(smtp.Username, smtp.Password),
                         EnableSsl = true
                     };
+                    var frontendUrl = _configuration["App:FrontendUrl"] ?? "http://localhost:5174";
                     var mailMessage = new System.Net.Mail.MailMessage
                     {
                         From = new System.Net.Mail.MailAddress(smtp.SenderEmail, smtp.SenderName),
                         Subject = "Reset Password Finance Tracker",
-                        Body = $"Klik link berikut untuk reset password: http://localhost:5174/reset-password?token={tokenString}",
+                        Body = $"Klik link berikut untuk reset password: {frontendUrl.TrimEnd('/')}/reset-password?token={tokenString}",
                         IsBodyHtml = false
                     };
                     mailMessage.To.Add(user.Email);
@@ -570,11 +571,12 @@ public class AuthController : ControllerBase
             Credentials = new System.Net.NetworkCredential(smtp.Username, smtp.Password),
             EnableSsl = true
         };
+        var frontendUrl = _configuration["App:FrontendUrl"] ?? "http://localhost:5174";
         var mailMessage = new System.Net.Mail.MailMessage
         {
             From = new System.Net.Mail.MailAddress(smtp.SenderEmail, smtp.SenderName),
             Subject = "Verifikasi Email Finance Tracker",
-            Body = $"Halo, silakan klik link berikut untuk memverifikasi akun Anda: http://localhost:5174/verify-email?token={token}\n\nLink ini berlaku selama 24 jam.",
+            Body = $"Halo, silakan klik link berikut untuk memverifikasi akun Anda: {frontendUrl.TrimEnd('/')}/verify-email?token={token}\n\nLink ini berlaku selama 24 jam.",
             IsBodyHtml = false
         };
         mailMessage.To.Add(email);
