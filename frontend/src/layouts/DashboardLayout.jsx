@@ -36,6 +36,7 @@ const DashboardLayout = ({ children }) => {
     const [email, setEmail] = useState(localStorage.getItem('auth_email') || '');
     const [name, setName] = useState(localStorage.getItem('auth_name') || '');
     const [role, setRole] = useState(localStorage.getItem('auth_role') || 'User');
+    const [picture, setPicture] = useState(localStorage.getItem('auth_picture') || '');
     const displayName = name || email || 'User';
     const tourKey = 'ft_tour_seen_v1';
 
@@ -52,6 +53,7 @@ const DashboardLayout = ({ children }) => {
             setEmail(localStorage.getItem('auth_email') || '');
             setName(localStorage.getItem('auth_name') || '');
             setRole(localStorage.getItem('auth_role') || 'User');
+            setPicture(localStorage.getItem('auth_picture') || '');
         };
         window.addEventListener('storage', sync);
         window.addEventListener('auth-updated', sync);
@@ -390,7 +392,11 @@ const DashboardLayout = ({ children }) => {
                                 aria-label="Profile menu"
                                 data-tour="profile-menu"
                             >
-                                {initials || <User size={18} />}
+                                {picture ? (
+                                    <img src={picture} alt="" className="w-full h-full rounded-full object-cover" />
+                                ) : (
+                                    initials || <User size={18} />
+                                )}
                             </button>
 
                             {isProfileMenuOpen ? (

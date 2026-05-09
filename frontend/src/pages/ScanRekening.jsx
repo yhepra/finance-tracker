@@ -72,6 +72,13 @@ export default function ScanRekening() {
 
         const catRows = Array.isArray(categoriesRes?.data?.data) ? categoriesRes.data.data : [];
         setCategories(catRows);
+
+        // Set default bank from preference
+        const prefBankId = localStorage.getItem('prefs_defaultBankId');
+        if (prefBankId) {
+          const preferred = bankRows.find(b => String(b.id) === String(prefBankId));
+          if (preferred) setBankCode(preferred.code);
+        }
       } catch (error) {
         if (error?.response?.status === 401) {
           localStorage.removeItem('auth_token');
@@ -116,10 +123,15 @@ export default function ScanRekening() {
 
   const bankOptions = useMemo(() => {
     const active = banks.filter((b) => b?.isActive !== false);
-    return active.map((b) => ({
-      value: b.code,
-      label: b.name,
-    }));
+    return active.map((b) => {
+      const code = String(b.code).toUpperCase();
+      return {
+        value: b.code,
+        label: b.code,
+        subtitle: b.name,
+        logo: b.logoUrl || `/img/banks/${code}.png`,
+      };
+    });
   }, [banks]);
 
   const categoryById = useMemo(() => {

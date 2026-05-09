@@ -47,6 +47,7 @@ public class BanksController : ControllerBase
                 x.Name,
                 x.IsActive,
                 _parsers.Any(p => p.CanParse(x.Code)) || AiSupportedBanks.Contains(x.Code),
+                x.LogoUrl,
                 x.CreatedAtUtc
             ))
             .ToList();
@@ -106,6 +107,7 @@ public class BanksController : ControllerBase
                 entity.Name,
                 entity.IsActive,
                 _parsers.Any(p => p.CanParse(entity.Code)) || AiSupportedBanks.Contains(entity.Code),
+                entity.LogoUrl,
                 entity.CreatedAtUtc
             )
         });
@@ -147,9 +149,53 @@ public class BanksController : ControllerBase
                 entity.Name,
                 entity.IsActive,
                 _parsers.Any(p => p.CanParse(entity.Code)) || AiSupportedBanks.Contains(entity.Code),
+                entity.LogoUrl,
                 entity.CreatedAtUtc
             )
         });
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpPost("{id:int}/logo")]
+    public async Task<IActionResult> UploadLogo(int id, [FromBody] UploadLogoRequest request)
+    {
+        var entity = await _db.Banks.SingleOrDefaultAsync(x => x.Id == id);
+        if (entity == null) return NotFound(new { message = "Bank tidak ditemukan." });
+
+        if (string.IsNullOrWhiteSpace(request.Base64Data))
+        {
+            return BadRequest(new { message = "Data gambar kosong." });
+        }
+
+        try
+        {
+            var parts = request.Base64Data.Split(',');
+            var base64 = parts.Length > 1 ? parts[1] : parts[0];
+            var bytes = Convert.FromBase64String(base64);
+
+            var wwwroot = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+            var dir = Path.Combine(wwwroot, "img", "banks");
+            if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+
+            var fileName = $"{entity.Code}_{DateTime.Now.Ticks}.png";
+            var filePath = Path.Combine(dir, fileName);
+
+            if (!string.IsNullOrEmpty(entity.LogoUrl) && entity.LogoUrl.StartsWith("/img/banks/"))
+            {
+                var oldPath = Path.Combine(wwwroot, entity.LogoUrl.TrimStart('/'));
+                if (System.IO.File.Exists(oldPath)) System.IO.File.Delete(oldPath);
+            }
+
+            await System.IO.File.WriteAllBytesAsync(filePath, bytes);
+            entity.LogoUrl = $"/img/banks/{fileName}";
+            await _db.SaveChangesAsync();
+
+            return Ok(new { logoUrl = entity.LogoUrl });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = $"Gagal menyimpan logo: {ex.Message}" });
+        }
     }
 
     [Authorize(Roles = "Admin")]
@@ -166,5 +212,6 @@ public class BanksController : ControllerBase
 
     public record CreateBankRequest(string Code, string Name, bool? IsActive);
     public record UpdateBankRequest(string? Name, bool? IsActive);
-    public record BankRowDto(int Id, string Code, string Name, bool IsActive, bool IsSupported, DateTime CreatedAtUtc);
+    public record UploadLogoRequest(string Base64Data);
+    public record BankRowDto(int Id, string Code, string Name, bool IsActive, bool IsSupported, string? LogoUrl, DateTime CreatedAtUtc);
 }

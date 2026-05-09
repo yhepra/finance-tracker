@@ -376,7 +376,8 @@ export default function HutangPiutang() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
+                {/* Desktop View Table */}
+                <table className="min-w-full text-sm hidden md:table">
                   <thead className="bg-slate-50 text-slate-600">
                     <tr>
                       <th className="text-left font-semibold px-6 py-3">Jenis</th>
@@ -470,6 +471,94 @@ export default function HutangPiutang() {
                     })}
                   </tbody>
                 </table>
+
+                {/* Mobile View Card List */}
+                <div className="md:hidden divide-y divide-slate-100">
+                  {filteredItems.map((it) => {
+                    const due = formatDate(it?.dueDate)
+                    const isPaid = it?.status === 'paid'
+                    const isPiutang = it?.kind === 'piutang'
+                    const itPaid = Number(it?.paidAmount) || 0
+                    const itRemaining = remainingAmount(it)
+                    return (
+                      <div key={it.id} className="p-5 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-widest ${
+                                isPiutang
+                                  ? 'bg-blue-50 text-blue-700 border border-blue-100'
+                                  : 'bg-red-50 text-red-700 border border-red-100'
+                              }`}
+                            >
+                              {isPiutang ? 'Piutang' : 'Hutang'}
+                            </span>
+                            <span
+                              className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-widest ${
+                                isPaid
+                                  ? 'bg-green-50 text-green-700 border border-green-100'
+                                  : 'bg-amber-50 text-amber-700 border border-amber-100'
+                              }`}
+                            >
+                              {isPaid ? 'Lunas' : 'Belum lunas'}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDelete(it)}
+                            className="p-2 text-slate-400 hover:text-rose-600"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+
+                        <div>
+                          <h3 className="text-base font-black text-slate-900">{it?.counterparty || '-'}</h3>
+                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Jatuh Tempo: {due}</div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                          <div>
+                            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total</div>
+                            <div className="text-sm font-bold text-slate-700">{formatRp(Number(it?.amount) || 0)}</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Sisa Tagihan</div>
+                            <div className={`text-sm font-black ${isPaid ? 'text-green-600' : 'text-indigo-600'}`}>{formatRp(itRemaining)}</div>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2">
+                          {!isPaid && (
+                            <button
+                              onClick={() => openPaymentForm(it.id)}
+                              className="flex-1 bg-indigo-600 text-white font-black text-[10px] uppercase tracking-widest py-3 rounded-xl shadow-lg shadow-indigo-100"
+                            >
+                              Catat Bayar
+                            </button>
+                          )}
+                          {isPaid && (
+                            <button
+                              onClick={() => undoPaid(it.id)}
+                              className="flex-1 border border-slate-200 text-slate-600 font-black text-[10px] uppercase tracking-widest py-3 rounded-xl hover:bg-slate-50"
+                            >
+                              Batalkan Lunas
+                            </button>
+                          )}
+                          <button
+                            onClick={() => {
+                              setHistoryTarget(it)
+                              setIsHistoryOpen(true)
+                            }}
+                            className="w-12 flex items-center justify-center border border-slate-200 rounded-xl text-slate-500"
+                          >
+                            <History size={18} />
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
             )}
           </div>

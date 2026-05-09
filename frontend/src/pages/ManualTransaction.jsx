@@ -111,7 +111,11 @@ const ManualTransaction = () => {
   }, [categories]);
 
   const accountOptions = useMemo(() => {
-    return accounts.map((a) => ({ value: String(a.id), label: a.name }));
+    return accounts.map((a) => ({
+      value: String(a.id),
+      label: a.bankCode || 'BANK',
+      subtitle: a.name
+    }));
   }, [accounts]);
 
   const typeOptions = useMemo(() => {
@@ -270,7 +274,8 @@ const ManualTransaction = () => {
 
             <div className="border border-slate-200 rounded-2xl overflow-hidden">
               <div className="overflow-auto">
-                <table className="w-full text-left border-collapse text-sm min-w-[900px]">
+                {/* Desktop View Table */}
+                <table className="w-full text-left border-collapse text-sm min-w-[900px] hidden md:table">
                   <thead>
                     <tr className="bg-slate-50 text-slate-600 uppercase tracking-wider text-xs border-b">
                       <th className="p-3 pl-5 font-semibold w-48">Rekening</th>
@@ -366,6 +371,95 @@ const ManualTransaction = () => {
                     ))}
                   </tbody>
                 </table>
+
+                {/* Mobile View Input Cards */}
+                <div className="md:hidden divide-y divide-slate-100 bg-slate-50/30">
+                  {rows.map((r, idx) => (
+                    <div key={r.rowId} className="p-4 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-white px-2 py-1 rounded-md border border-slate-200">Baris #{idx + 1}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeRow(r.rowId)}
+                          className="flex items-center gap-1.5 text-xs font-bold text-rose-500 hover:text-rose-600"
+                        >
+                          <Trash2 size={14} />
+                          Hapus
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Rekening</label>
+                          <SearchableSelect
+                            value={r.accountId}
+                            onChange={(v) => updateRow(r.rowId, { accountId: String(v) })}
+                            options={accountOptions}
+                            emptyLabel="Pilih..."
+                            disabled={isLoadingAccounts || accounts.length === 0}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tanggal</label>
+                          <DateInputDMY
+                            value={r.date}
+                            onChange={(v) => updateRow(r.rowId, { date: v })}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Jenis</label>
+                          <SearchableSelect
+                            value={r.type}
+                            onChange={(v) => {
+                              const nextType = Number(v);
+                              const allowed = categoriesByType[nextType] || [];
+                              const stillValid = allowed.some((c) => String(c.id) === String(r.categoryId));
+                              updateRow(r.rowId, {
+                                type: nextType,
+                                categoryId: stillValid ? r.categoryId : '',
+                              });
+                            }}
+                            options={typeOptions}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Kategori</label>
+                          <SearchableSelect
+                            value={r.categoryId}
+                            onChange={(v) => updateRow(r.rowId, { categoryId: String(v) })}
+                            options={(categoriesByType[Number(r.type)] || []).map((c) => ({
+                              value: String(c.id),
+                              label: c.name,
+                            }))}
+                            emptyLabel="Pilih..."
+                            disabled={isLoadingCategories}
+                          />
+                        </div>
+                        <div className="col-span-2 space-y-1">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Deskripsi</label>
+                          <input
+                            type="text"
+                            value={r.description}
+                            onChange={(e) => updateRow(r.rowId, { description: e.target.value })}
+                            placeholder="Ketik keterangan transaksi..."
+                            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-indigo-500 transition-all"
+                          />
+                        </div>
+                        <div className="col-span-2 space-y-1">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nominal (Rp)</label>
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            value={r.amount}
+                            onChange={(e) => updateRow(r.rowId, { amount: e.target.value })}
+                            placeholder="0"
+                            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-lg font-black text-indigo-600 outline-none focus:border-indigo-500 transition-all"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
 

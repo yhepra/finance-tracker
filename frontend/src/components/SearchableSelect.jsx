@@ -28,6 +28,8 @@ export default function SearchableSelect({
       .map((o) => ({
         value: o?.value,
         label: String(o?.label ?? ''),
+        subtitle: o?.subtitle,
+        logo: o?.logo,
         disabled: Boolean(o?.disabled),
       }))
       .filter((o) => o.label.length > 0)
@@ -43,15 +45,20 @@ export default function SearchableSelect({
     if (!showSearch) return normalizedOptions
     const q = query.trim().toLowerCase()
     if (!q) return normalizedOptions
-    return normalizedOptions.filter((o) => o.label.toLowerCase().includes(q))
+    return normalizedOptions.filter((o) => 
+      o.label.toLowerCase().includes(q) || 
+      (o.subtitle && o.subtitle.toLowerCase().includes(q))
+    )
   }, [normalizedOptions, query, showSearch])
 
-  const selectedLabel = useMemo(() => {
+  const selectedItem = useMemo(() => {
     const found = normalizedOptions.find((o) => Object.is(o.value, value))
-    if (found) return found.label
-    if (value === '' && typeof emptyLabel === 'string') return emptyLabel
-    return ''
+    if (found) return found
+    if (value === '' && typeof emptyLabel === 'string') return { label: emptyLabel }
+    return null
   }, [normalizedOptions, value, emptyLabel])
+
+  const selectedLabel = selectedItem?.label || ''
 
   useEffect(() => {
     if (!open) return
@@ -174,10 +181,17 @@ export default function SearchableSelect({
         aria-haspopup="listbox"
         aria-expanded={open}
       >
-        <span className={`truncate ${selectedLabel ? '' : 'text-slate-400'}`}>
-          {selectedLabel || placeholder}
-        </span>
-        <ChevronDown size={16} className={`${open ? 'rotate-180' : ''} transition-transform`} />
+        <div className="flex items-center gap-3 truncate">
+          {selectedItem?.logo && (
+            <div className="w-6 h-6 rounded bg-slate-100 flex-shrink-0 overflow-hidden border border-slate-200">
+              <img src={selectedItem.logo} alt="" className="w-full h-full object-contain" />
+            </div>
+          )}
+          <span className={`truncate ${selectedLabel ? '' : 'text-slate-400'}`}>
+            {selectedLabel || placeholder}
+          </span>
+        </div>
+        <ChevronDown size={16} className={`${open ? 'rotate-180' : ''} transition-transform text-slate-400`} />
       </button>
 
       {open && typeof document !== 'undefined'
@@ -191,12 +205,12 @@ export default function SearchableSelect({
                 top: menuPos.placement === 'bottom' ? `${menuPos.top}px` : undefined,
                 bottom: menuPos.placement === 'top' ? `${window.innerHeight - menuPos.top}px` : undefined,
               }}
-              className={`z-[100] rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden ${menuClassName}`}
+              className={`z-[100] rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 ${menuClassName}`}
             >
               {showSearch ? (
-                <div className="p-2 border-b border-slate-100">
-                  <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
-                    <Search size={16} className="text-slate-400" />
+                <div className="p-3 border-b border-slate-100 bg-slate-50/30">
+                  <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 shadow-sm focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-500/5 transition-all">
+                    <Search size={18} className="text-slate-400" />
                     <input
                       ref={searchRef}
                       value={query}
@@ -205,7 +219,7 @@ export default function SearchableSelect({
                         setActiveIndex(0)
                       }}
                       onKeyDown={onKeyDown}
-                      className="w-full min-w-0 text-sm outline-none bg-transparent text-slate-800 placeholder:text-slate-400"
+                      className="w-full min-w-0 text-sm font-semibold outline-none bg-transparent text-slate-800 placeholder:text-slate-400"
                       placeholder="Cari..."
                       autoComplete="off"
                       autoCorrect="off"
@@ -215,9 +229,12 @@ export default function SearchableSelect({
                 </div>
               ) : null}
 
-              <div className="max-h-64 overflow-auto py-1">
+              <div className="max-h-80 overflow-auto py-1.5 custom-scrollbar">
                 {filtered.length === 0 ? (
-                  <div className="px-4 py-3 text-sm text-slate-500">Tidak ada hasil.</div>
+                  <div className="px-6 py-8 text-center">
+                    <Search size={24} className="mx-auto text-slate-200 mb-2" />
+                    <div className="text-sm font-medium text-slate-500">Tidak ada hasil.</div>
+                  </div>
                 ) : (
                   filtered.map((o, idx) => {
                     const isSelected = Object.is(o.value, value)
@@ -228,15 +245,32 @@ export default function SearchableSelect({
                         type="button"
                         onMouseEnter={() => setActiveIndex(idx)}
                         onClick={() => (o.disabled ? null : selectValue(o.value))}
-                        className={`w-full text-left px-4 py-2 text-sm ${
-                          isActive ? 'bg-slate-50' : ''
-                        } ${o.disabled ? 'text-slate-400 cursor-not-allowed' : isSelected ? 'font-semibold text-slate-900' : 'text-slate-700'} ${o.disabled ? '' : 'hover:bg-slate-50'}`}
+                        className={`w-full text-left px-4 py-3 flex items-center gap-4 transition-colors ${
+                          isActive ? 'bg-indigo-50/50' : ''
+                        } ${o.disabled ? 'opacity-40 cursor-not-allowed' : ''} ${isSelected ? 'bg-indigo-50' : ''}`}
                         role="option"
                         aria-selected={isSelected}
                         aria-disabled={o.disabled}
                         disabled={o.disabled}
                       >
-                        {o.label}
+                        {o.logo && (
+                          <div className="w-10 h-10 rounded-xl bg-white border border-slate-100 p-1.5 flex-shrink-0 shadow-sm flex items-center justify-center">
+                            <img src={o.logo} alt="" className="w-full h-full object-contain" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className={`text-sm truncate ${isSelected || isActive ? 'font-bold text-indigo-700' : 'font-semibold text-slate-700'}`}>
+                            {o.label}
+                          </div>
+                          {o.subtitle && (
+                            <div className={`text-[11px] truncate mt-0.5 ${isActive ? 'text-indigo-400' : 'text-slate-400'}`}>
+                              {o.subtitle}
+                            </div>
+                          )}
+                        </div>
+                        {isSelected && (
+                          <div className="w-1.5 h-1.5 rounded-full bg-indigo-600 shadow-[0_0_8px_rgba(79,70,229,0.5)]" />
+                        )}
                       </button>
                     )
                   })

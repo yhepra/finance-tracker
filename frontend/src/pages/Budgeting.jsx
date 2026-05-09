@@ -190,7 +190,7 @@ export default function Budgeting() {
 
             {/* Summary Cards */}
             {!isLoading && statuses.length > 0 && (
-              <div className="grid grid-cols-3 gap-4 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                 <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
                   <div className="text-xs font-black uppercase tracking-widest text-slate-400 mb-2">Total Anggaran</div>
                   <div className="text-xl font-black text-slate-900">{formatCurrency(totalBudgeted)}</div>
@@ -200,7 +200,7 @@ export default function Budgeting() {
                   <div className={`text-xl font-black ${overallPct >= 100 ? 'text-red-600' : overallPct >= 70 ? 'text-amber-600' : 'text-slate-900'}`}>
                     {formatCurrency(totalSpent)}
                   </div>
-                  <div className="mt-2 w-full bg-slate-100 rounded-full h-1.5">
+                  <div className="mt-2 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
                     <div className={`h-1.5 rounded-full ${getProgressColor(overallPct)}`} style={{ width: `${overallPct}%` }} />
                   </div>
                 </div>
@@ -210,7 +210,7 @@ export default function Budgeting() {
                     {totalRemaining < 0 ? <TrendingDown size={18} /> : <TrendingUp size={18} />}
                     {formatCurrency(Math.abs(totalRemaining))}
                   </div>
-                  {totalRemaining < 0 && <div className="text-xs font-bold text-red-500 mt-1">Melebihi anggaran!</div>}
+                  {totalRemaining < 0 && <div className="text-[10px] font-bold text-red-500 mt-1">Melebihi anggaran!</div>}
                 </div>
               </div>
             )}

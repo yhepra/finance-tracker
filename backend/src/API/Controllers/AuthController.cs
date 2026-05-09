@@ -257,6 +257,7 @@ public class AuthController : ControllerBase
                 EmailVerificationTokenExpiry = null,
                 IsOnboardingCompleted = !string.IsNullOrWhiteSpace(fullName),
                 Role = email.Equals("yhepra@gmail.com", StringComparison.OrdinalIgnoreCase) ? "Admin" : "User",
+                ProfilePictureUrl = userInfo.Picture,
                 CreatedAtUtc = DateTime.UtcNow
             };
             _db.Users.Add(user);
@@ -279,6 +280,8 @@ public class AuthController : ControllerBase
                 user.FullName = fullName;
                 if (!user.IsOnboardingCompleted) user.IsOnboardingCompleted = true;
             }
+
+            user.ProfilePictureUrl = userInfo.Picture;
 
             await _db.SaveChangesAsync();
         }
@@ -318,7 +321,7 @@ public class AuthController : ControllerBase
         await _db.SaveChangesAsync();
 
         var token = CreateJwt(user);
-        return Ok(new AuthResponse(token, user.Email, user.FullName, true, user.Role));
+        return Ok(new AuthResponse(token, user.Email, user.FullName, true, user.Role, user.ProfilePictureUrl));
     }
 
     [Authorize]
@@ -522,7 +525,8 @@ public class AuthController : ControllerBase
             new("dob", user.DateOfBirth.HasValue ? user.DateOfBirth.Value.ToString("yyyy-MM-dd") : string.Empty),
             new("verified", user.IsEmailVerified.ToString().ToLower()),
             new("onboarded", user.IsOnboardingCompleted.ToString().ToLower()),
-            new(ClaimTypes.Role, user.Role)
+            new(ClaimTypes.Role, user.Role),
+            new("picture", user.ProfilePictureUrl ?? string.Empty)
         };
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
@@ -671,7 +675,7 @@ public class AuthController : ControllerBase
     public record RegisterRequest(string Email, string Password);
     public record LoginRequest(string Email, string Password);
     public record GoogleLoginRequest(string Credential);
-    public record AuthResponse(string Token, string Email, string Name, bool IsOnboardingCompleted = false, string Role = "User");
+    public record AuthResponse(string Token, string Email, string Name, bool IsOnboardingCompleted = false, string Role = "User", string? Picture = null);
     public record VerifyEmailRequest(string Token);
     public record UpdateProfileRequest(string FullName, DateOnly? DateOfBirth);
     public record ChangePasswordRequest(string OldPassword, string NewPassword);

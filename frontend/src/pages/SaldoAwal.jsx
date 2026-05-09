@@ -169,6 +169,7 @@ export default function SaldoAwal() {
       setNewHolderName('')
       setNewAccNumber('')
       setIsAddModalOpen(false)
+      showNotification('Akun baru berhasil ditambahkan.')
       load() // Reload to get the full data structure in rows
     } catch (err) {
       const apiMessage = err?.response?.data?.message || err?.response?.data?.title
@@ -306,14 +307,15 @@ export default function SaldoAwal() {
     <>
       <DashboardLayout>
         <div className="w-full">
-          <div className="flex items-end justify-between gap-4 flex-wrap">
+          {/* Desktop Header */}
+          <div className="hidden md:flex items-end justify-between gap-4 flex-wrap">
             <div>
-              <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Daftar Rekening</h1>
+              <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Rekening</h1>
               <p className="mt-1 text-slate-500">Kelola rekening dan pantau pergerakan saldo bulanan Anda.</p>
             </div>
-            <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-3 flex-wrap flex-1 justify-end">
               <div className="flex items-center gap-2">
-                <div className="text-xs text-slate-500">Bulan</div>
+                <div className="text-xs text-slate-500 font-bold uppercase tracking-widest">Bulan</div>
                 <div className="w-24">
                   <SearchableSelect
                     value={month}
@@ -324,7 +326,7 @@ export default function SaldoAwal() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <div className="text-xs text-slate-500">Tahun</div>
+                <div className="text-xs text-slate-500 font-bold uppercase tracking-widest">Tahun</div>
                 <input
                   value={year}
                   onChange={(e) => setYear(Number(e.target.value))}
@@ -332,9 +334,9 @@ export default function SaldoAwal() {
                   className="w-28 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                 />
               </div>
-              <div className="text-right mr-4">
-                <div className="text-xs text-slate-500">Total Saldo</div>
-                <div className="text-xl font-bold text-slate-900">
+              <div className="text-right mr-4 border-l border-slate-200 pl-4">
+                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Total Saldo</div>
+                <div className="text-xl font-black text-indigo-600">
                 Rp {new Intl.NumberFormat(numberLocale).format(totalBalance)}
                 </div>
               </div>
@@ -345,6 +347,51 @@ export default function SaldoAwal() {
                 <Plus size={20} />
                 Tambah Akun
               </button>
+            </div>
+          </div>
+
+          {/* Mobile Header */}
+          <div className="md:hidden space-y-6">
+            <div>
+              <h1 className="text-2xl font-black text-slate-900 tracking-tight">Rekening</h1>
+              <p className="text-sm text-slate-500">Kelola & pantau pergerakan saldo.</p>
+            </div>
+            
+            <div className="bg-white p-5 rounded-[2rem] border border-slate-200 shadow-sm space-y-5">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Bulan</label>
+                  <SearchableSelect
+                    value={month}
+                    onChange={(v) => setMonth(Number(v))}
+                    options={Array.from({ length: 12 }).map((_, i) => ({ value: i + 1, label: String(i + 1) }))}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tahun</label>
+                  <input
+                    value={year}
+                    onChange={(e) => setYear(Number(e.target.value))}
+                    type="number"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-2.5 text-sm font-bold outline-none focus:border-indigo-500 transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                <div>
+                  <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Keseluruhan</div>
+                  <div className="text-xl font-black text-indigo-600">
+                    Rp {new Intl.NumberFormat(numberLocale).format(totalBalance)}
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsAddModalOpen(true)}
+                  className="w-12 h-12 flex items-center justify-center bg-indigo-600 text-white rounded-2xl shadow-lg shadow-indigo-100 active:scale-90 transition-all"
+                >
+                  <Plus size={24} />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -393,7 +440,8 @@ export default function SaldoAwal() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
+                {/* Desktop View Table */}
+                <table className="min-w-full text-sm hidden md:table">
                   <thead className="bg-slate-50 text-slate-600">
                     <tr>
                       <th className="text-left font-semibold px-5 py-3">Rekening</th>
@@ -415,9 +463,31 @@ export default function SaldoAwal() {
                             </div>
                           </td>
                           <td className="px-5 py-3">
-                            <div>
-                                <div className="text-sm font-medium text-slate-700">{r.bankName || r.bankCode || '-'}</div>
-                                <div className="text-xs text-slate-400 font-mono">{r.accountNumber || '-'}</div>
+                            <div className="flex items-center gap-3">
+                                {(() => {
+                                  const master = masterBanks.find(b => b.code === r.bankCode)
+                                  const logo = master?.logoUrl || `/img/banks/${String(r.bankCode).toUpperCase()}.png`
+                                  const bankNameDisplay = master?.name || r.bankName || r.bankCode || '-'
+                                  return (
+                                    <>
+                                      <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 p-1.5 flex items-center justify-center shadow-sm overflow-hidden shrink-0">
+                                        <img 
+                                          src={logo} 
+                                          alt="" 
+                                          className="w-full h-full object-contain"
+                                          onError={(e) => {
+                                            e.target.onerror = null
+                                            e.target.src = 'https://ui-avatars.com/api/?name=' + (r.bankCode || 'BK') + '&background=f1f5f9&color=94a3b8&bold=true'
+                                          }}
+                                        />
+                                      </div>
+                                      <div>
+                                          <div className="text-sm font-bold text-slate-900">{bankNameDisplay}</div>
+                                          <div className="text-xs text-slate-400 font-mono tracking-tight">{r.accountNumber || '-'}</div>
+                                      </div>
+                                    </>
+                                  )
+                                })()}
                             </div>
                           </td>
                           <td className="px-5 py-3 text-right whitespace-nowrap">
@@ -482,6 +552,80 @@ export default function SaldoAwal() {
                     })}
                   </tbody>
                 </table>
+
+                {/* Mobile View Cards */}
+                <div className="md:hidden divide-y divide-slate-100">
+                  {filteredRows.map((r) => {
+                    const master = masterBanks.find(b => b.code === r.bankCode)
+                    const logo = master?.logoUrl || `/img/banks/${String(r.bankCode).toUpperCase()}.png`
+                    const bankNameDisplay = master?.name || r.bankName || r.bankCode || '-'
+                    
+                    return (
+                      <div key={r.accountId} className="p-5 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 p-1.5 flex items-center justify-center shadow-sm overflow-hidden shrink-0">
+                              <img 
+                                src={logo} 
+                                alt="" 
+                                className="w-full h-full object-contain"
+                                onError={(e) => {
+                                  e.target.onerror = null
+                                  e.target.src = 'https://ui-avatars.com/api/?name=' + (r.bankCode || 'BK') + '&background=f1f5f9&color=94a3b8&bold=true'
+                                }}
+                              />
+                            </div>
+                            <div>
+                              <div className="text-sm font-black text-slate-900">{r.accountName}</div>
+                              <div className="text-[10px] font-bold text-slate-400 tracking-wider uppercase">{bankNameDisplay}</div>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => startEdit(r)}
+                              className="p-2 rounded-xl bg-indigo-50 text-indigo-600"
+                            >
+                              <Pencil size={16} />
+                            </button>
+                            <button
+                              onClick={() => startDeleteAccount(r.accountId)}
+                              className="p-2 rounded-xl bg-rose-50 text-rose-600"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                          <div>
+                            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Saldo Awal</div>
+                            <div className="text-sm font-bold text-slate-700">
+                              {r.balance == null ? '-' : `Rp ${new Intl.NumberFormat(numberLocale).format(r.balance)}`}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Saldo Akhir</div>
+                            <div className="text-sm font-black text-indigo-600">
+                              Rp {new Intl.NumberFormat(numberLocale).format(r.closingBalance || 0)}
+                            </div>
+                          </div>
+                          <div className="col-span-2 pt-2 border-t border-slate-200/50 flex justify-between items-center">
+                            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Mutasi</div>
+                            <div className="flex gap-2">
+                              {r.income > 0 && (
+                                <span className="text-[10px] font-bold text-emerald-600">+Rp{new Intl.NumberFormat(numberLocale).format(r.income)}</span>
+                              )}
+                              {r.expense > 0 && (
+                                <span className="text-[10px] font-bold text-rose-600">-Rp{new Intl.NumberFormat(numberLocale).format(r.expense)}</span>
+                              )}
+                              {r.income === 0 && r.expense === 0 && <span className="text-[10px] text-slate-400">Tidak ada mutasi</span>}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
             )}
           </div>
@@ -537,7 +681,12 @@ export default function SaldoAwal() {
                     setNewBankCode('')
                   }
                 }}
-                options={masterBanks.map(b => ({ value: b.id, label: `${b.name} (${b.code})` }))}
+                options={masterBanks.map(b => ({ 
+                  value: b.id, 
+                  label: b.code,
+                  subtitle: b.name,
+                  logo: b.logoUrl || `/img/banks/${String(b.code).toUpperCase()}.png`
+                }))}
                 placeholder="Cari & Pilih Bank..."
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50/30 px-5 py-4 text-sm outline-none focus:border-indigo-500 focus:bg-white transition-all"
               />
@@ -645,7 +794,12 @@ export default function SaldoAwal() {
                     setEditBankCode('')
                   }
                 }}
-                options={masterBanks.map(b => ({ value: b.id, label: `${b.name} (${b.code})` }))}
+                options={masterBanks.map(b => ({ 
+                  value: b.id, 
+                  label: b.code,
+                  subtitle: b.name,
+                  logo: b.logoUrl || `/img/banks/${String(b.code).toUpperCase()}.png`
+                }))}
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50/30 px-5 py-4 text-sm outline-none focus:border-indigo-500 focus:bg-white transition-all"
               />
             </div>

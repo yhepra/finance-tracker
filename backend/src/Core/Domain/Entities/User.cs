@@ -13,6 +13,7 @@ public class User
     public DateTime? EmailVerificationTokenExpiry { get; set; }
     public bool IsOnboardingCompleted { get; set; } = false;
     public string Role { get; set; } = "User";
+    public string? ProfilePictureUrl { get; set; }
     public DateTime CreatedAtUtc { get; set; }
 
     public ICollection<Account> Accounts { get; set; } = new List<Account>();

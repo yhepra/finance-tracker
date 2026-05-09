@@ -23,6 +23,7 @@ export default function Login() {
       localStorage.setItem('auth_name', res.data.name || '')
       localStorage.setItem('auth_onboarded', res.data.isOnboardingCompleted ? 'true' : 'false')
       localStorage.setItem('auth_role', res.data.role || 'User')
+      localStorage.setItem('auth_picture', res.data.picture || '')
 
       window.dispatchEvent(new Event('auth-updated'))
       if (rememberMe) localStorage.setItem('remember_email', String(res.data.email || '').trim().toLowerCase())
@@ -60,6 +61,7 @@ export default function Login() {
       localStorage.setItem('auth_name', res.data.name || '')
       localStorage.setItem('auth_onboarded', res.data.isOnboardingCompleted ? 'true' : 'false')
       localStorage.setItem('auth_role', res.data.role || 'User')
+      localStorage.setItem('auth_picture', res.data.picture || '')
       
       window.dispatchEvent(new Event('auth-updated'))
       if (rememberMe) localStorage.setItem('remember_email', normalizedEmail)

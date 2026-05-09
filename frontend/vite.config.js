@@ -11,6 +11,11 @@ export default defineConfig({
         target: 'http://127.0.0.1:5116',
         changeOrigin: true,
         secure: false,
+      },
+      '/img': {
+        target: 'http://127.0.0.1:5116',
+        changeOrigin: true,
+        secure: false,
       }
     }
   }

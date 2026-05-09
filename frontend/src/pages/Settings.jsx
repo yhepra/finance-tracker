@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import Cropper from 'react-easy-crop'
 import axios from 'axios'
 import { useNavigate, useParams } from 'react-router-dom'
 import { 
@@ -148,6 +149,16 @@ export default function Settings() {
   const [directoryQuery, setDirectoryQuery] = useState('')
   const [directoryPage, setDirectoryPage] = useState(1)
   const [directoryPageSize, setDirectoryPageSize] = useState(20)
+
+  // Logo Cropping State
+  const [cropModalOpen, setCropModalOpen] = useState(false)
+  const [cropImage, setCropImage] = useState(null)
+  const [cropBankId, setCropBankId] = useState(null)
+  const [crop, setCrop] = useState({ x: 0, y: 0 })
+  const [zoom, setZoom] = useState(1)
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null)
+  const [cropLoading, setCropLoading] = useState(false)
+  const fileInputRef = useRef(null)
   const [directoryTotal, setDirectoryTotal] = useState(0)
   const [directoryItems, setDirectoryItems] = useState([])
   const [editingTermId, setEditingTermId] = useState(null)
@@ -383,13 +394,14 @@ export default function Settings() {
   const saveSmtp = async (e) => {
     e.preventDefault()
     setSmtpError('')
-    setSmtpSuccess('')
     setSmtpLoading(true)
     try {
       await axios.put('/api/settings/smtp', smtpConfig)
-      setSmtpSuccess('Pengaturan SMTP berhasil disimpan.')
+      showNotification('Pengaturan SMTP berhasil disimpan.')
     } catch {
-      setSmtpError('Gagal menyimpan pengaturan SMTP.')
+      const msg = 'Gagal menyimpan pengaturan SMTP.'
+      setSmtpError(msg)
+      showNotification(msg, 'error')
     } finally {
       setSmtpLoading(false)
     }
@@ -397,13 +409,14 @@ export default function Settings() {
 
   const testSmtp = async () => {
     setSmtpError('')
-    setSmtpSuccess('')
     setSmtpTestLoading(true)
     try {
       const res = await axios.post('/api/settings/smtp/test')
-      setSmtpSuccess(res.data.message || 'Koneksi SMTP berhasil di test.')
+      showNotification(res.data.message || 'Koneksi SMTP berhasil di test.')
     } catch (err) {
-      setSmtpError(err?.response?.data?.message || 'Gagal koneksi SMTP.')
+      const msg = err?.response?.data?.message || 'Gagal koneksi SMTP.'
+      setSmtpError(msg)
+      showNotification(msg, 'error')
     } finally {
       setSmtpTestLoading(false)
     }
@@ -412,14 +425,16 @@ export default function Settings() {
   const changePassword = async (e) => {
     e.preventDefault()
     setCpError('')
-    setCpSuccess('')
     setCpLoading(true)
     try {
       const res = await axios.post('/api/auth/change-password', cpData)
-      setCpSuccess(res.data.message || 'Password berhasil diubah.')
+      const msg = res.data.message || 'Password berhasil diubah.'
+      showNotification(msg)
       setCpData({ oldPassword: '', newPassword: '' })
     } catch (err) {
-      setCpError(err?.response?.data?.message || 'Gagal mengubah password.')
+      const msg = err?.response?.data?.message || 'Gagal mengubah password.'
+      setCpError(msg)
+      showNotification(msg, 'error')
     } finally {
       setCpLoading(false)
     }
@@ -428,7 +443,6 @@ export default function Settings() {
   const saveProfile = async (e) => {
     e.preventDefault()
     setProfileError('')
-    setProfileSuccess('')
     setProfileLoading(true)
     try {
       const res = await axios.put('/api/auth/profile', {
@@ -440,7 +454,7 @@ export default function Settings() {
       localStorage.setItem('auth_name', res.data.name || '')
       localStorage.setItem('auth_dob', res.data.dateOfBirth || '')
       window.dispatchEvent(new Event('auth-updated'))
-      setProfileSuccess('Profil berhasil disimpan.')
+      showNotification('Profil berhasil disimpan.')
       loadMe()
     } catch (err) {
       if (err?.response?.status === 401) {
@@ -455,6 +469,7 @@ export default function Settings() {
       const status = err?.response?.status
       const message = err?.response ? apiMessage || `Gagal menyimpan (HTTP ${status}).` : 'Tidak bisa menghubungi server.'
       setProfileError(message)
+      showNotification(message, 'error')
     } finally {
       setProfileLoading(false)
     }
@@ -598,6 +613,52 @@ export default function Settings() {
     }
   }
 
+  const handleLogoChange = async (e, bankId) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    
+    setBankError('')
+    const reader = new FileReader()
+    reader.onload = async () => {
+      try {
+        const base64 = await processImageAuto(reader.result)
+        const res = await axios.post(`/api/banks/${bankId}/logo`, { base64Data: base64 })
+        const logoUrl = res.data.logoUrl
+        setBanks((prev) => prev.map((b) => (b.id === bankId ? { ...b, logoUrl } : b)))
+        showNotification('Logo bank berhasil diperbarui.', 'success')
+      } catch (err) {
+        console.error(err)
+        setBankError('Gagal mengupload logo. Pastikan server berjalan.')
+      }
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const processImageAuto = async (imageSrc) => {
+    const image = await new Promise((resolve, reject) => {
+      const img = new Image()
+      img.addEventListener('load', () => resolve(img))
+      img.addEventListener('error', (err) => reject(err))
+      img.src = imageSrc
+    })
+    
+    const size = Math.max(image.width, image.height)
+    const canvas = document.createElement('canvas')
+    canvas.width = size
+    canvas.height = size
+    const ctx = canvas.getContext('2d')
+
+    ctx.fillStyle = 'white'
+    ctx.fillRect(0, 0, size, size)
+
+    const offsetX = (size - image.width) / 2
+    const offsetY = (size - image.height) / 2
+
+    ctx.drawImage(image, offsetX, offsetY)
+    return canvas.toDataURL('image/png')
+  }
+
+
   const toggleBankActive = async (b) => {
     setBankError('')
     try {
@@ -657,6 +718,7 @@ export default function Settings() {
       else localStorage.removeItem('prefs_defaultBankId')
       window.dispatchEvent(new Event('prefs-updated'))
       window.dispatchEvent(new Event('auth-updated'))
+      showNotification('Pengaturan umum berhasil disimpan.')
     } catch (err) {
       if (err?.response?.status === 401) {
         localStorage.removeItem('auth_token')
@@ -672,6 +734,7 @@ export default function Settings() {
         ? apiMessage || `Gagal menyimpan (HTTP ${status}).`
         : 'Tidak bisa menghubungi server API. Pastikan backend jalan (default: http://localhost:5116).'
       setGeneralError(message)
+      showNotification(message, 'error')
     }
   }
 
@@ -800,6 +863,7 @@ export default function Settings() {
       setGeminiKey('')
       setGeminiShowKey(false)
       setIsGeminiKeyOpen(false)
+      showNotification('API Key Gemini berhasil disimpan.')
     } catch (err) {
       if (err?.response?.status === 401) {
         localStorage.removeItem('auth_token')
@@ -812,6 +876,7 @@ export default function Settings() {
       const status = err?.response?.status
       const message = err?.response ? apiMessage || `Gagal menyimpan (HTTP ${status}).` : 'Tidak bisa menghubungi server.'
       setGeminiError(message)
+      showNotification(message, 'error')
     }
   }
 
@@ -974,8 +1039,9 @@ export default function Settings() {
           }
 
           return (
-            <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6 items-start">
-              <aside className="bg-white border border-slate-200/60 rounded-3xl shadow-sm p-6 h-fit sticky top-0">
+            <div className="flex flex-col lg:grid lg:grid-cols-[280px_1fr] gap-6 items-start">
+              {/* Desktop Sidebar */}
+              <aside className="hidden lg:block bg-white border border-slate-200/60 rounded-3xl shadow-sm p-6 h-fit sticky top-0">
                 <div className="flex items-baseline gap-2 mb-6">
                   <div className="text-lg font-black text-slate-900 tracking-tight leading-tight">Settings</div>
                 </div>
@@ -1035,6 +1101,30 @@ export default function Settings() {
                   {renderMenuSection('About', 'about')}
                 </div>
               </aside>
+
+              {/* Mobile Native-style Navigation */}
+              <div className="lg:hidden w-full overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
+                <div className="flex gap-2 min-w-max">
+                  {menuItems.map((item) => {
+                    const isActive = tab === item.key;
+                    const Icon = item.icon;
+                    return (
+                      <button
+                        key={item.key}
+                        onClick={() => go(item.key)}
+                        className={`flex items-center gap-2 px-5 py-3 rounded-2xl whitespace-nowrap transition-all duration-300 font-bold text-sm ${
+                          isActive 
+                            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100 scale-105' 
+                            : 'bg-white border border-slate-200 text-slate-600 hover:border-indigo-200'
+                        }`}
+                      >
+                        <Icon size={16} />
+                        {item.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
               <main className="space-y-6">
                 <div className="flex items-start justify-between gap-4 p-6 bg-white border border-slate-200/60 rounded-3xl shadow-sm">
@@ -1393,17 +1483,18 @@ export default function Settings() {
                     </form>
                   </div>
                 ) : tab === 'general' ? (
-                  <div id="general" className="mt-6 bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
+                  <div id="general" className="mt-6 space-y-6">
                     {generalError ? (
-                      <div className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+                      <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
                         {generalError}
                       </div>
                     ) : null}
 
-                    <form onSubmit={saveGeneral} className="space-y-5">
-                      <div className="space-y-4">
-                        <div>
-                          <label className="block text-sm font-semibold text-slate-700 mb-1">Bahasa</label>
+                    <form onSubmit={saveGeneral} className="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
+                      <div className="p-6 space-y-6">
+                        <div className="space-y-1">
+                          <label className="text-sm font-black text-slate-900">Bahasa Aplikasi</label>
+                          <p className="text-xs text-slate-500 mb-2">Pilih bahasa yang digunakan untuk seluruh antarmuka aplikasi.</p>
                           <SearchableSelect
                             value={generalLanguage}
                             onChange={(v) => setGeneralLanguage(String(v))}
@@ -1411,30 +1502,32 @@ export default function Settings() {
                               { value: 'id', label: 'Bahasa Indonesia' },
                               { value: 'en', label: 'English' },
                             ]}
-                            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                            className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-3.5 outline-none focus:border-indigo-500 focus:bg-white transition-all"
                             disabled={generalLoading}
                             searchThreshold={99}
                           />
                         </div>
 
-                        <div>
-                          <label className="block text-sm font-semibold text-slate-700 mb-1">Format tanggal</label>
+                        <div className="space-y-1">
+                          <label className="text-sm font-black text-slate-900">Format Tanggal</label>
+                          <p className="text-xs text-slate-500 mb-2">Atur bagaimana tanggal ditampilkan di laporan dan riwayat transaksi.</p>
                           <SearchableSelect
                             value={generalDateFormat}
                             onChange={(v) => setGeneralDateFormat(String(v))}
                             options={[
-                              { value: 'DMY', label: 'DD/MM/YYYY' },
-                              { value: 'MDY', label: 'MM/DD/YYYY' },
-                              { value: 'YMD', label: 'YYYY-MM-DD' },
+                              { value: 'DMY', label: 'DD/MM/YYYY (Indonesia)' },
+                              { value: 'MDY', label: 'MM/DD/YYYY (US)' },
+                              { value: 'YMD', label: 'YYYY-MM-DD (ISO)' },
                             ]}
-                            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                            className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-3.5 outline-none focus:border-indigo-500 focus:bg-white transition-all"
                             disabled={generalLoading}
                             searchThreshold={99}
                           />
                         </div>
 
-                        <div>
-                          <label className="block text-sm font-semibold text-slate-700 mb-1">Format angka</label>
+                        <div className="space-y-1">
+                          <label className="text-sm font-black text-slate-900">Format Angka & Mata Uang</label>
+                          <p className="text-xs text-slate-500 mb-2">Pilih gaya pemisah ribuan dan desimal yang Anda sukai.</p>
                           <SearchableSelect
                             value={generalNumberLocale}
                             onChange={(v) => setGeneralNumberLocale(String(v))}
@@ -1442,14 +1535,15 @@ export default function Settings() {
                               { value: 'id-ID', label: 'Indonesia (1.234,56)' },
                               { value: 'en-US', label: 'US (1,234.56)' },
                             ]}
-                            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                            className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-3.5 outline-none focus:border-indigo-500 focus:bg-white transition-all"
                             disabled={generalLoading}
                             searchThreshold={99}
                           />
                         </div>
 
-                        <div>
-                          <label className="block text-sm font-semibold text-slate-700 mb-1">Default bank</label>
+                        <div className="space-y-1">
+                          <label className="text-sm font-black text-slate-900">Rekening Bank Utama</label>
+                          <p className="text-xs text-slate-500 mb-2">Bank yang akan otomatis terpilih saat Anda mengunggah atau memindai rekening.</p>
                           <SearchableSelect
                             value={generalDefaultBankId}
                             onChange={(v) => setGeneralDefaultBankId(String(v))}
@@ -1459,22 +1553,22 @@ export default function Settings() {
                               .sort((a, b) => String(a.name).localeCompare(String(b.name)))
                               .map((b) => ({ value: String(b.id), label: `${b.name} (${b.code})` }))}
                             emptyLabel="Tidak ada"
-                            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                            className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-3.5 outline-none focus:border-indigo-500 focus:bg-white transition-all"
                             disabled={generalLoading}
                           />
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 flex-wrap">
+                      <div className="px-6 py-5 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between gap-4">
                         <button
                           type="submit"
                           disabled={generalLoading}
-                          className="rounded-xl bg-indigo-600 text-white font-semibold px-5 py-3 hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                          className="flex-1 md:flex-none rounded-2xl bg-indigo-600 text-white font-black px-8 py-4 hover:bg-indigo-700 shadow-xl shadow-indigo-100 disabled:opacity-60 transition-all active:scale-95"
                         >
-                          Simpan
+                          {generalLoading ? 'Menyimpan...' : 'Simpan Perubahan'}
                         </button>
-                        <div className="text-xs text-slate-500">
-                          Pengaturan ini akan dipakai untuk tampilan tanggal/angka dan default pilihan bank (upload/scan).
+                        <div className="hidden md:block text-xs text-slate-500 max-w-[300px]">
+                          Pengaturan ini akan diterapkan pada seluruh sistem laporan dan pemindaian data.
                         </div>
                       </div>
                     </form>
@@ -1535,99 +1629,193 @@ export default function Settings() {
                     ) : directoryItems.length === 0 ? (
                       <div className="p-6 text-slate-500">Tidak ada data.</div>
                     ) : (
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full text-sm">
-                          <thead className="bg-slate-50 text-slate-600">
-                            <tr>
-                              <th className="text-left font-semibold px-5 py-3 w-64">Key</th>
-                              <th className="text-left font-semibold px-5 py-3">Indonesia</th>
-                              <th className="text-left font-semibold px-5 py-3">English</th>
-                              {isAdmin && <th className="text-right font-semibold px-5 py-3 w-56">Aksi</th>}
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100">
-                            {directoryItems.map((row) => {
-                              const isEditing = editingTermId === row.id
-                              return (
-                                <tr key={row.id} className="hover:bg-slate-50">
-                                  <td className="px-5 py-3 font-mono text-slate-700">
-                                    {isEditing ? (
+                      <>
+                        {/* Desktop Table View */}
+                        <div className="hidden md:block overflow-x-auto">
+                          <table className="min-w-full text-sm">
+                            <thead className="bg-slate-50 text-slate-600">
+                              <tr>
+                                <th className="text-left font-semibold px-5 py-3 w-64">Key</th>
+                                <th className="text-left font-semibold px-5 py-3">Indonesia</th>
+                                <th className="text-left font-semibold px-5 py-3">English</th>
+                                {isAdmin && <th className="text-right font-semibold px-5 py-3 w-56">Aksi</th>}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {directoryItems.map((row) => {
+                                const isEditing = editingTermId === row.id
+                                return (
+                                  <tr key={row.id} className="hover:bg-slate-50">
+                                    <td className="px-5 py-3 font-mono text-slate-700">
+                                      {isEditing ? (
+                                        <input
+                                          value={editTermKey}
+                                          onChange={(e) => setEditTermKey(e.target.value)}
+                                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                                        />
+                                      ) : (
+                                        row.key
+                                      )}
+                                    </td>
+                                    <td className="px-5 py-3">
+                                      {isEditing ? (
+                                        <input
+                                          value={editTermIdText}
+                                          onChange={(e) => setEditTermIdText(e.target.value)}
+                                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                                        />
+                                      ) : (
+                                        <span className="text-slate-800">{row.indonesian}</span>
+                                      )}
+                                    </td>
+                                    <td className="px-5 py-3">
+                                      {isEditing ? (
+                                        <input
+                                          value={editTermEnText}
+                                          onChange={(e) => setEditTermEnText(e.target.value)}
+                                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                                        />
+                                      ) : (
+                                        <span className="text-slate-800">{row.english}</span>
+                                      )}
+                                    </td>
+                                    {isAdmin && (
+                                      <td className="px-5 py-3 text-right">
+                                        {isEditing ? (
+                                          <div className="inline-flex gap-2">
+                                            <button
+                                              type="button"
+                                              onClick={() => saveEditTerm(row.id)}
+                                              className="px-3 py-2 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700"
+                                            >
+                                              Simpan
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={cancelEditTerm}
+                                              className="px-3 py-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50"
+                                            >
+                                              Batal
+                                            </button>
+                                          </div>
+                                        ) : (
+                                          <div className="inline-flex gap-2">
+                                            <button
+                                              type="button"
+                                              onClick={() => startEditTerm(row)}
+                                              className="px-3 py-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50"
+                                            >
+                                              Edit
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => deleteTerm(row.id)}
+                                              className="px-3 py-2 rounded-lg border border-red-200 text-red-700 hover:bg-red-50"
+                                            >
+                                              Hapus
+                                            </button>
+                                          </div>
+                                        )}
+                                      </td>
+                                    )}
+                                  </tr>
+                                )
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {/* Mobile Card View */}
+                        <div className="md:hidden divide-y divide-slate-100">
+                          {directoryItems.map((row) => {
+                            const isEditing = editingTermId === row.id
+                            return (
+                              <div key={row.id} className="p-5 space-y-4">
+                                {isEditing ? (
+                                  <div className="space-y-4 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
+                                    <div>
+                                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Key</label>
                                       <input
                                         value={editTermKey}
                                         onChange={(e) => setEditTermKey(e.target.value)}
-                                        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                                       />
-                                    ) : (
-                                      row.key
-                                    )}
-                                  </td>
-                                  <td className="px-5 py-3">
-                                    {isEditing ? (
+                                    </div>
+                                    <div>
+                                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Indonesia</label>
                                       <input
                                         value={editTermIdText}
                                         onChange={(e) => setEditTermIdText(e.target.value)}
-                                        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                                       />
-                                    ) : (
-                                      <span className="text-slate-800">{row.indonesian}</span>
-                                    )}
-                                  </td>
-                                  <td className="px-5 py-3">
-                                    {isEditing ? (
+                                    </div>
+                                    <div>
+                                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">English</label>
                                       <input
                                         value={editTermEnText}
                                         onChange={(e) => setEditTermEnText(e.target.value)}
-                                        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                                       />
-                                    ) : (
-                                      <span className="text-slate-800">{row.english}</span>
+                                    </div>
+                                    {isAdmin && (
+                                      <div className="flex gap-2 pt-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => saveEditTerm(row.id)}
+                                          className="flex-1 py-3 rounded-xl bg-indigo-600 text-white font-bold text-sm shadow-md shadow-indigo-100 hover:bg-indigo-700 active:scale-95 transition-all"
+                                        >
+                                          Simpan
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={cancelEditTerm}
+                                          className="flex-1 py-3 rounded-xl border border-slate-200 text-slate-700 font-bold text-sm hover:bg-slate-50 transition-colors"
+                                        >
+                                          Batal
+                                        </button>
+                                      </div>
                                     )}
-                                  </td>
-                                  {isAdmin && (
-                                    <td className="px-5 py-3 text-right">
-                                      {isEditing ? (
-                                        <div className="inline-flex gap-2">
-                                          <button
-                                            type="button"
-                                            onClick={() => saveEditTerm(row.id)}
-                                            className="px-3 py-2 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700"
-                                          >
-                                            Simpan
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={cancelEditTerm}
-                                            className="px-3 py-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50"
-                                          >
-                                            Batal
-                                          </button>
-                                        </div>
-                                      ) : (
-                                        <div className="inline-flex gap-2">
-                                          <button
-                                            type="button"
-                                            onClick={() => startEditTerm(row)}
-                                            className="px-3 py-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50"
-                                          >
-                                            Edit
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={() => deleteTerm(row.id)}
-                                            className="px-3 py-2 rounded-lg border border-red-200 text-red-700 hover:bg-red-50"
-                                          >
-                                            Hapus
-                                          </button>
-                                        </div>
-                                      )}
-                                    </td>
-                                  )}
-                                </tr>
-                              )
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-3">
+                                    <div className="font-mono text-sm text-indigo-600 font-bold break-all bg-indigo-50/50 px-3 py-1.5 rounded-lg inline-block">
+                                      {row.key}
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                      <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                        <div className="text-[10px] uppercase font-black text-slate-400 tracking-wider mb-1">Indonesia</div>
+                                        <div className="font-semibold text-slate-800 text-sm leading-tight">{row.indonesian}</div>
+                                      </div>
+                                      <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                        <div className="text-[10px] uppercase font-black text-slate-400 tracking-wider mb-1">English</div>
+                                        <div className="font-semibold text-slate-800 text-sm leading-tight">{row.english}</div>
+                                      </div>
+                                    </div>
+                                    {isAdmin && (
+                                      <div className="flex gap-2 pt-1">
+                                        <button
+                                          type="button"
+                                          onClick={() => startEditTerm(row)}
+                                          className="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-bold hover:bg-slate-200 text-xs transition-colors"
+                                        >
+                                          Edit
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => deleteTerm(row.id)}
+                                          className="flex-1 py-2.5 rounded-xl bg-red-50 text-red-700 font-bold hover:bg-red-100 text-xs transition-colors"
+                                        >
+                                          Hapus
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </>
                     )}
 
                     <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between gap-3 flex-wrap">
@@ -1677,90 +1865,172 @@ export default function Settings() {
                       ) : categories.length === 0 ? (
                         <div className="p-6 text-slate-500">Belum ada kategori.</div>
                       ) : (
-                        <div className="overflow-x-auto">
-                          <table className="min-w-full text-sm">
-                            <thead className="bg-slate-50 text-slate-600">
-                              <tr>
-                                <th className="text-left font-semibold px-5 py-3">Nama</th>
-                                <th className="text-left font-semibold px-5 py-3">Tipe</th>
-                                <th className="text-right font-semibold px-5 py-3 w-56">Aksi</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                              {categories
-                                .slice()
-                                .sort((a, b) => Number(a.type) - Number(b.type) || String(a.name).localeCompare(String(b.name)))
-                                .map((c) => {
-                                  const isEditing = editingId === c.id
-                                  return (
-                                    <tr key={c.id} className="hover:bg-slate-50">
-                                      <td className="px-5 py-3">
-                                        {isEditing ? (
+                        <>
+                          {/* Desktop Table View */}
+                          <div className="hidden md:block overflow-x-auto">
+                            <table className="min-w-full text-sm">
+                              <thead className="bg-slate-50 text-slate-600">
+                                <tr>
+                                  <th className="text-left font-semibold px-5 py-3">Nama</th>
+                                  <th className="text-left font-semibold px-5 py-3">Tipe</th>
+                                  <th className="text-right font-semibold px-5 py-3 w-56">Aksi</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {categories
+                                  .slice()
+                                  .sort((a, b) => Number(a.type) - Number(b.type) || String(a.name).localeCompare(String(b.name)))
+                                  .map((c) => {
+                                    const isEditing = editingId === c.id
+                                    return (
+                                      <tr key={c.id} className="hover:bg-slate-50">
+                                        <td className="px-5 py-3">
+                                          {isEditing ? (
+                                            <input
+                                              value={editName}
+                                              onChange={(e) => setEditName(e.target.value)}
+                                              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                                            />
+                                          ) : (
+                                            <span className="font-medium text-slate-800">{c.name}</span>
+                                          )}
+                                        </td>
+                                        <td className="px-5 py-3">
+                                          {isEditing ? (
+                                            <SearchableSelect
+                                              value={editType}
+                                              onChange={(v) => setEditType(Number(v))}
+                                              options={TRANSACTION_TYPES.map((t) => ({ value: t.value, label: t.label }))}
+                                              className="rounded-lg border border-slate-200 bg-white px-3 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                                              searchThreshold={99}
+                                            />
+                                          ) : (
+                                            <span className="text-slate-700">{typeLabel[String(c.type)] || `Tipe ${c.type}`}</span>
+                                          )}
+                                        </td>
+                                          <td className="px-5 py-3 text-right">
+                                            {isEditing ? (
+                                              <div className="inline-flex gap-2">
+                                                <button
+                                                  type="button"
+                                                  onClick={() => saveEdit(c.id)}
+                                                  className="px-3 py-2 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700"
+                                                >
+                                                  Simpan
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  onClick={cancelEdit}
+                                                  className="px-3 py-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50"
+                                                >
+                                                  Batal
+                                                </button>
+                                              </div>
+                                            ) : (
+                                              <div className="inline-flex gap-2">
+                                                <button
+                                                  type="button"
+                                                  onClick={() => startEdit(c)}
+                                                  className="px-3 py-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50"
+                                                >
+                                                  Edit
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => deleteCategory(c.id)}
+                                                  className="px-3 py-2 rounded-lg border border-red-200 text-red-700 hover:bg-red-50"
+                                                >
+                                                  Hapus
+                                                </button>
+                                              </div>
+                                            )}
+                                          </td>
+                                      </tr>
+                                    )
+                                  })}
+                              </tbody>
+                            </table>
+                          </div>
+
+                          {/* Mobile Card View */}
+                          <div className="md:hidden divide-y divide-slate-100">
+                            {categories
+                              .slice()
+                              .sort((a, b) => Number(a.type) - Number(b.type) || String(a.name).localeCompare(String(b.name)))
+                              .map((c) => {
+                                const isEditing = editingId === c.id
+                                return (
+                                  <div key={c.id} className="p-5 space-y-4">
+                                    {isEditing ? (
+                                      <div className="space-y-4 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
+                                        <div>
+                                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Nama Kategori</label>
                                           <input
                                             value={editName}
                                             onChange={(e) => setEditName(e.target.value)}
-                                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                                            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                                           />
-                                        ) : (
-                                          <span className="font-medium text-slate-800">{c.name}</span>
-                                        )}
-                                      </td>
-                                      <td className="px-5 py-3">
-                                        {isEditing ? (
+                                        </div>
+                                        <div>
+                                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Tipe Transaksi</label>
                                           <SearchableSelect
                                             value={editType}
                                             onChange={(v) => setEditType(Number(v))}
                                             options={TRANSACTION_TYPES.map((t) => ({ value: t.value, label: t.label }))}
-                                            className="rounded-lg border border-slate-200 bg-white px-3 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                                            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                                             searchThreshold={99}
                                           />
-                                        ) : (
-                                          <span className="text-slate-700">{typeLabel[String(c.type)] || `Tipe ${c.type}`}</span>
-                                        )}
-                                      </td>
-                                        <td className="px-5 py-3 text-right">
-                                          {isEditing ? (
-                                            <div className="inline-flex gap-2">
-                                              <button
-                                                type="button"
-                                                onClick={() => saveEdit(c.id)}
-                                                className="px-3 py-2 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700"
-                                              >
-                                                Simpan
-                                              </button>
-                                              <button
-                                                type="button"
-                                                onClick={cancelEdit}
-                                                className="px-3 py-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50"
-                                              >
-                                                Batal
-                                              </button>
-                                            </div>
-                                          ) : (
-                                            <div className="inline-flex gap-2">
-                                              <button
-                                                type="button"
-                                                onClick={() => startEdit(c)}
-                                                className="px-3 py-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50"
-                                              >
-                                                Edit
-                                              </button>
-                                              <button
-                                                type="button"
-                                                onClick={() => deleteCategory(c.id)}
-                                                className="px-3 py-2 rounded-lg border border-red-200 text-red-700 hover:bg-red-50"
-                                              >
-                                                Hapus
-                                              </button>
-                                            </div>
-                                          )}
-                                        </td>
-                                    </tr>
-                                  )
-                                })}
-                            </tbody>
-                          </table>
-                        </div>
+                                        </div>
+                                        <div className="flex gap-2 pt-2">
+                                          <button
+                                            type="button"
+                                            onClick={() => saveEdit(c.id)}
+                                            className="flex-1 py-3 rounded-xl bg-indigo-600 text-white font-bold text-sm shadow-md shadow-indigo-100 hover:bg-indigo-700 active:scale-95 transition-all"
+                                          >
+                                            Simpan
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={cancelEdit}
+                                            className="flex-1 py-3 rounded-xl border border-slate-200 text-slate-700 font-bold text-sm hover:bg-slate-50 transition-colors"
+                                          >
+                                            Batal
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-center justify-between gap-4">
+                                        <div className="flex-1">
+                                          <div className="font-semibold text-slate-800 text-lg leading-tight mb-1">{c.name}</div>
+                                          <div className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${
+                                            c.type === 1 ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-red-50 text-red-700 border border-red-100'
+                                          }`}>
+                                            {typeLabel[String(c.type)] || `Tipe ${c.type}`}
+                                          </div>
+                                        </div>
+                                        <div className="flex flex-col gap-2">
+                                          <button
+                                            type="button"
+                                            onClick={() => startEdit(c)}
+                                            className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-bold hover:bg-slate-200 text-xs transition-colors"
+                                          >
+                                            Edit
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => deleteCategory(c.id)}
+                                            className="px-4 py-2 rounded-xl bg-red-50 text-red-700 font-bold hover:bg-red-100 text-xs transition-colors"
+                                          >
+                                            Hapus
+                                          </button>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                )
+                              })}
+                          </div>
+                        </>
                       )}
                     </div>
                   </>
@@ -1788,45 +2058,192 @@ export default function Settings() {
                       ) : banks.length === 0 ? (
                         <div className="p-6 text-slate-500">Belum ada bank.</div>
                       ) : (
-                        <div className="overflow-x-auto">
-                          <table className="min-w-full text-sm">
-                            <thead className="bg-slate-50 text-slate-600">
-                              <tr>
-                                <th className="text-left font-semibold px-5 py-3">Kode</th>
-                                <th className="text-left font-semibold px-5 py-3">Nama</th>
-                                <th className="text-left font-semibold px-5 py-3">Status</th>
-                                <th className="text-left font-semibold px-5 py-3">Dukungan</th>
-                                {isAdmin && <th className="text-right font-semibold px-5 py-3 w-56">Aksi</th>}
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                              {banks
-                                .slice()
-                                .sort((a, b) => Number(b.isActive) - Number(a.isActive) || String(a.name).localeCompare(String(b.name)))
-                                .map((b) => {
-                                  const isEditing = editingBankId === b.id
-                                  return (
-                                    <tr key={b.id} className="hover:bg-slate-50">
-                                      <td className="px-5 py-3">
-                                        <span className="font-mono text-slate-800">{b.code}</span>
-                                      </td>
-                                      <td className="px-5 py-3">
+                        <>
+                          {/* Desktop Table View */}
+                          <div className="hidden md:block overflow-x-auto">
+                            <table className="min-w-full text-sm">
+                              <thead className="bg-slate-50 text-slate-600">
+                                <tr>
+                                  <th className="text-left font-semibold px-5 py-3">Logo</th>
+                                  <th className="text-left font-semibold px-5 py-3">Kode</th>
+                                  <th className="text-left font-semibold px-5 py-3">Nama</th>
+                                  <th className="text-left font-semibold px-5 py-3">Status</th>
+                                  <th className="text-left font-semibold px-5 py-3">Dukungan</th>
+                                  {isAdmin && <th className="text-right font-semibold px-5 py-3 w-56">Aksi</th>}
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {banks
+                                  .slice()
+                                  .sort((a, b) => Number(b.isActive) - Number(a.isActive) || String(a.name).localeCompare(String(b.name)))
+                                  .map((b) => {
+                                    const isEditing = editingBankId === b.id
+                                    return (
+                                      <tr key={b.id} className="hover:bg-slate-50">
+                                        <td className="px-5 py-3">
+                                          <div className="relative group w-10 h-10">
+                                            {b.logoUrl ? (
+                                              <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 p-1.5 flex items-center justify-center shadow-sm overflow-hidden">
+                                                <img src={b.logoUrl} alt="" className="w-full h-full object-contain" />
+                                              </div>
+                                            ) : (
+                                              <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 font-bold text-xs">
+                                                {b.code.substring(0, 2)}
+                                              </div>
+                                            )}
+                                            {isAdmin && (
+                                              <label className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl cursor-pointer">
+                                                <Plus size={16} className="text-white" />
+                                                <input
+                                                  type="file"
+                                                  className="hidden"
+                                                  accept="image/*"
+                                                  onChange={(e) => handleLogoChange(e, b.id)}
+                                                />
+                                              </label>
+                                            )}
+                                          </div>
+                                        </td>
+                                        <td className="px-5 py-3">
+                                          <span className="font-mono text-slate-800">{b.code}</span>
+                                        </td>
+                                        <td className="px-5 py-3">
+                                          {isEditing ? (
+                                            <input
+                                              value={editBankName}
+                                              onChange={(e) => setEditBankName(e.target.value)}
+                                              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                                            />
+                                          ) : (
+                                            <span className="font-medium text-slate-800">{b.name}</span>
+                                          )}
+                                        </td>
+                                        <td className="px-5 py-3">
+                                          <button
+                                            type="button"
+                                            disabled={!isAdmin}
+                                            onClick={() => toggleBankActive(b)}
+                                            className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold border ${
+                                              b.isActive
+                                                ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                                                : 'bg-slate-50 text-slate-600 border-slate-200'
+                                            } ${!isAdmin && 'cursor-default'}`}
+                                          >
+                                            {b.isActive ? 'Aktif' : 'Nonaktif'}
+                                          </button>
+                                        </td>
+                                        <td className="px-5 py-3">
+                                          <span
+                                            className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold border ${
+                                              b.isSupported
+                                                ? 'bg-blue-50 text-blue-700 border-blue-100'
+                                                : 'bg-amber-50 text-amber-700 border-amber-100'
+                                            }`}
+                                          >
+                                            {b.isSupported ? 'Didukung' : 'Belum'}
+                                          </span>
+                                        </td>
+                                        {isAdmin && (
+                                          <td className="px-5 py-3 text-right">
+                                            {isEditing ? (
+                                              <div className="inline-flex gap-2">
+                                                <button
+                                                  type="button"
+                                                  onClick={() => saveEditBank(b.id)}
+                                                  className="px-3 py-2 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700"
+                                                >
+                                                  Simpan
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  onClick={cancelEditBank}
+                                                  className="px-3 py-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50"
+                                                >
+                                                  Batal
+                                                </button>
+                                              </div>
+                                            ) : (
+                                              <div className="inline-flex gap-2">
+                                                <button
+                                                  type="button"
+                                                  onClick={() => startEditBank(b)}
+                                                  className="px-3 py-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50"
+                                                >
+                                                  Edit
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => deleteBank(b.id)}
+                                                  className="px-3 py-2 rounded-lg border border-red-200 text-red-700 hover:bg-red-50"
+                                                >
+                                                  Hapus
+                                                </button>
+                                              </div>
+                                            )}
+                                          </td>
+                                        )}
+                                      </tr>
+                                    )
+                                  })}
+                              </tbody>
+                            </table>
+                          </div>
+
+                          {/* Mobile Card View */}
+                          <div className="md:hidden divide-y divide-slate-100">
+                            {banks
+                              .slice()
+                              .sort((a, b) => Number(b.isActive) - Number(a.isActive) || String(a.name).localeCompare(String(b.name)))
+                              .map((b) => {
+                                const isEditing = editingBankId === b.id
+                                return (
+                                  <div key={b.id} className="p-5 space-y-4">
+                                    <div className="flex items-center gap-4">
+                                      <div className="relative group w-14 h-14 shrink-0">
+                                        {b.logoUrl ? (
+                                          <div className="w-14 h-14 rounded-2xl bg-white border border-slate-200 p-2 flex items-center justify-center shadow-sm overflow-hidden">
+                                            <img src={b.logoUrl} alt="" className="w-full h-full object-contain" />
+                                          </div>
+                                        ) : (
+                                          <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 font-bold text-lg">
+                                            {b.code.substring(0, 2)}
+                                          </div>
+                                        )}
+                                        {isAdmin && (
+                                          <label className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl cursor-pointer">
+                                            <Plus size={20} className="text-white" />
+                                            <input
+                                              type="file"
+                                              className="hidden"
+                                              accept="image/*"
+                                              onChange={(e) => handleLogoChange(e, b.id)}
+                                            />
+                                          </label>
+                                        )}
+                                      </div>
+                                      <div className="flex-1 min-w-0">
                                         {isEditing ? (
                                           <input
                                             value={editBankName}
                                             onChange={(e) => setEditBankName(e.target.value)}
-                                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                                            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 mb-1"
+                                            placeholder="Nama Bank"
                                           />
                                         ) : (
-                                          <span className="font-medium text-slate-800">{b.name}</span>
+                                          <div className="font-bold text-slate-900 text-lg leading-tight truncate">{b.name}</div>
                                         )}
-                                      </td>
-                                      <td className="px-5 py-3">
+                                        <div className="font-mono text-xs text-slate-500 font-semibold">{b.code}</div>
+                                      </div>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-2 gap-3">
+                                      <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 flex flex-col items-center justify-center gap-1.5">
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Status</div>
                                         <button
                                           type="button"
                                           disabled={!isAdmin}
                                           onClick={() => toggleBankActive(b)}
-                                          className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold border ${
+                                          className={`inline-flex items-center rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wider border ${
                                             b.isActive
                                               ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
                                               : 'bg-slate-50 text-slate-600 border-slate-200'
@@ -1834,10 +2251,11 @@ export default function Settings() {
                                         >
                                           {b.isActive ? 'Aktif' : 'Nonaktif'}
                                         </button>
-                                      </td>
-                                      <td className="px-5 py-3">
+                                      </div>
+                                      <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 flex flex-col items-center justify-center gap-1.5">
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Dukungan Scan</div>
                                         <span
-                                          className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold border ${
+                                          className={`inline-flex items-center rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wider border ${
                                             b.isSupported
                                               ? 'bg-blue-50 text-blue-700 border-blue-100'
                                               : 'bg-amber-50 text-amber-700 border-amber-100'
@@ -1845,52 +2263,53 @@ export default function Settings() {
                                         >
                                           {b.isSupported ? 'Didukung' : 'Belum'}
                                         </span>
-                                      </td>
-                                      {isAdmin && (
-                                        <td className="px-5 py-3 text-right">
-                                          {isEditing ? (
-                                            <div className="inline-flex gap-2">
-                                              <button
-                                                type="button"
-                                                onClick={() => saveEditBank(b.id)}
-                                                className="px-3 py-2 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700"
-                                              >
-                                                Simpan
-                                              </button>
-                                              <button
-                                                type="button"
-                                                onClick={cancelEditBank}
-                                                className="px-3 py-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50"
-                                              >
-                                                Batal
-                                              </button>
-                                            </div>
-                                          ) : (
-                                            <div className="inline-flex gap-2">
-                                              <button
-                                                type="button"
-                                                onClick={() => startEditBank(b)}
-                                                className="px-3 py-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50"
-                                              >
-                                                Edit
-                                              </button>
-                                              <button
-                                                type="button"
-                                                onClick={() => deleteBank(b.id)}
-                                                className="px-3 py-2 rounded-lg border border-red-200 text-red-700 hover:bg-red-50"
-                                              >
-                                                Hapus
-                                              </button>
-                                            </div>
-                                          )}
-                                        </td>
-                                      )}
-                                    </tr>
-                                  )
-                                })}
-                            </tbody>
-                          </table>
-                        </div>
+                                      </div>
+                                    </div>
+
+                                    {isAdmin && (
+                                      <div className="flex gap-2 pt-2 border-t border-slate-100">
+                                        {isEditing ? (
+                                          <>
+                                            <button
+                                              type="button"
+                                              onClick={() => saveEditBank(b.id)}
+                                              className="flex-1 py-3 rounded-xl bg-indigo-600 text-white font-bold text-sm shadow-md shadow-indigo-100 hover:bg-indigo-700 active:scale-95 transition-all"
+                                            >
+                                              Simpan
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={cancelEditBank}
+                                              className="flex-1 py-3 rounded-xl border border-slate-200 text-slate-700 font-bold text-sm hover:bg-slate-50 transition-colors"
+                                            >
+                                              Batal
+                                            </button>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <button
+                                              type="button"
+                                              onClick={() => startEditBank(b)}
+                                              className="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-bold hover:bg-slate-200 text-xs transition-colors"
+                                            >
+                                              Edit
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => deleteBank(b.id)}
+                                              className="flex-1 py-2.5 rounded-xl bg-red-50 text-red-700 font-bold hover:bg-red-100 text-xs transition-colors"
+                                            >
+                                              Hapus
+                                            </button>
+                                          </>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                )
+                              })}
+                          </div>
+                        </>
                       )}
                     </div>
                   </>

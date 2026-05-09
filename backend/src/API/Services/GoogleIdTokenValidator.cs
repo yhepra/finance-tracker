@@ -78,13 +78,15 @@ public sealed class GoogleIdTokenValidator
         var emailVerified = principal.FindFirstValue("email_verified") ?? string.Empty;
         var sub = principal.FindFirstValue("sub") ?? principal.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
 
+        var picture = principal.FindFirstValue("picture") ?? string.Empty;
+        
         if (string.IsNullOrWhiteSpace(email))
             return (false, "Email tidak ditemukan pada token Google.", null);
 
         if (!string.Equals(emailVerified, "true", StringComparison.OrdinalIgnoreCase))
             return (false, "Email Google belum terverifikasi.", null);
 
-        return (true, "OK", new GoogleUserInfo(Subject: sub, Email: email, Name: name));
+        return (true, "OK", new GoogleUserInfo(Subject: sub, Email: email, Name: name, Picture: picture));
     }
 
     private async Task<JsonWebKeySet> GetJwksAsync(CancellationToken cancellationToken)
@@ -97,6 +99,6 @@ public sealed class GoogleIdTokenValidator
         }) ?? new JsonWebKeySet("{}");
     }
 
-    public record GoogleUserInfo(string Subject, string Email, string Name);
+    public record GoogleUserInfo(string Subject, string Email, string Name, string Picture);
 }
 
