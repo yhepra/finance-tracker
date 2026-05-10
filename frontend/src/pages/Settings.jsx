@@ -295,6 +295,7 @@ export default function Settings() {
       if (typeof res.data?.email === 'string') localStorage.setItem('auth_email', res.data.email)
       if (typeof res.data?.name === 'string') localStorage.setItem('auth_name', res.data.name)
       localStorage.setItem('auth_dob', res.data?.dateOfBirth || '')
+      if (typeof res.data?.picture === 'string') localStorage.setItem('auth_picture', res.data.picture)
       window.dispatchEvent(new Event('auth-updated'))
     } catch (err) {
       if (err?.response?.status === 401) {

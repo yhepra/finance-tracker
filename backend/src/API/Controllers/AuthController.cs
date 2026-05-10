@@ -331,7 +331,8 @@ public class AuthController : ControllerBase
         var email = User.FindFirstValue(ClaimTypes.Email) ?? User.FindFirstValue(JwtRegisteredClaimNames.Email) ?? string.Empty;
         var name = User.FindFirstValue(ClaimTypes.Name) ?? User.FindFirstValue("name") ?? string.Empty;
         var dob = User.FindFirstValue("dob") ?? string.Empty;
-        return Ok(new { email, name, dateOfBirth = dob });
+        var picture = User.FindFirstValue("picture") ?? string.Empty;
+        return Ok(new { email, name, dateOfBirth = dob, picture });
     }
 
     [Authorize]
