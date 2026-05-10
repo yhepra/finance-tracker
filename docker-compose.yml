@@ -42,6 +42,8 @@ services:
       Secrets__DataKey: ${SECRETS_DATA_KEY:-default-production-data-key-please-change-it-in-env-file!}
     ports:
       - "5116:5116"
+    volumes:
+      - backend_wwwroot:/app/wwwroot
     networks:
       - financetracker-net
 
@@ -64,6 +66,8 @@ services:
 
 volumes:
   mysql_data:
+    driver: local
+  backend_wwwroot:
     driver: local
 
 networks:
