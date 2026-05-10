@@ -226,7 +226,7 @@ public class AuthController : ControllerBase
         }
 
         var token = CreateJwt(user);
-        return Ok(new AuthResponse(token, user.Email, user.FullName, user.IsOnboardingCompleted, user.Role));
+        return Ok(new AuthResponse(token, user.Email, user.FullName, user.IsOnboardingCompleted, user.Role, user.ProfilePictureUrl));
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -295,7 +295,7 @@ public class AuthController : ControllerBase
         }
 
         var token = CreateJwt(user);
-        return Ok(new AuthResponse(token, user.Email, user.FullName, user.IsOnboardingCompleted, user.Role));
+        return Ok(new AuthResponse(token, user.Email, user.FullName, user.IsOnboardingCompleted, user.Role, user.ProfilePictureUrl));
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -353,7 +353,7 @@ public class AuthController : ControllerBase
         await _db.SaveChangesAsync();
 
         var token = CreateJwt(user);
-        return Ok(new { email = user.Email, name = user.FullName, dateOfBirth = user.DateOfBirth, token });
+        return Ok(new { email = user.Email, name = user.FullName, dateOfBirth = user.DateOfBirth, token, picture = user.ProfilePictureUrl });
     }
 
     // ─────────────────────────────────────────────────────────────────
